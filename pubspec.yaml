@@ -1,0 +1,105 @@
+name: Emon
+description: "Smart Energy Monitoring App"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  wifi_iot: ^0.3.19+1
+  drop_shadow_image: ^0.9.0
+  cupertino_icons: ^1.0.8
+  animated_text_kit: ^4.2.2
+  animations: ^2.0.11
+  flutter_staggered_animations: ^1.0.0
+  curved_navigation_bar: ^1.0.3
+  flutter_launcher_icons: "^0.9.2" 
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+
+flutter_icons:
+  android: "launcher_icon" 
+  ios: true
+  image_path: "assets/images/logo_single.png" 
+
+ 
+  web:
+    generate: true
+    image_path: "assets/images/logo_single.png" 
+
+
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^4.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+  assets:
+    - assets/images/logo_single.png 
+    - assets/images/logo_light.png
+    - assets/staticimgs/login-concept-illustration.png
+    - assets/staticimgs/freepik-export-20240902163459KfVi.png
+    - assets/staticimgs/mobile-login-concept-illustration.png
+    - assets/staticimgs/stock-exchange-data-concept.png
+    - assets/staticimgs/tech-support-concept-illustration.png
+    - assets/staticimgs/service-technicians.png
+    - assets/staticimgs/internet_connection.png
+
+
+
+
+  fonts:
+
+     - family: Kanit
+       fonts:
+         - asset: assets/fonts/Kanit/Kanit-Bold.ttf
+    
+     - family: Varela_Round
+       fonts:
+         - asset: assets/fonts/Varela_Round/VarelaRound-Regular.ttf
+
+     - family: Rubik
+       fonts:
+         - asset: assets/fonts/Rubik/static/Rubik-Regular.ttf
+         - asset: assets/fonts/Rubik/static/Rubik-Medium.ttf
+         - asset: assets/fonts/Rubik/static/Rubik-Bold.ttf
+         - asset: assets/fonts/Rubik/static/Rubik-Light.ttf
+         - asset: assets/fonts/Rubik/static/Rubik-SemiBold.ttf
+
+  
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
