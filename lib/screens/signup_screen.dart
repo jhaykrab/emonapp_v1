@@ -31,7 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         // Display success message with check icon
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
@@ -67,7 +67,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Handle Firebase Authentication errors
         if (e.code == 'weak-password') {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.close, color: Colors.red),
@@ -87,7 +87,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           );
         } else if (e.code == 'email-already-in-use') {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.close, color: Colors.red),
@@ -110,7 +110,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Handle other errors
         print(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
               children: [
                 Icon(Icons.close, color: Colors.red),

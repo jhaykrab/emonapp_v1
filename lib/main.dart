@@ -5,9 +5,7 @@ import 'package:Emon/screens/SplashScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
-import 'firebase_options.dart'; // Import your firebase_options.dart file
+// Import your firebase_options.dart file
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

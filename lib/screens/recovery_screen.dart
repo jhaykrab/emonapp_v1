@@ -1,6 +1,5 @@
-import 'package:Emon/screens/code_verification_screen.dart'; // Correct import
+// Correct import
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:Emon/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 
@@ -28,7 +27,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
 
         // Display success message
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
@@ -62,7 +61,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         // Handle Firebase Authentication errors
         if (e.code == 'user-not-found') {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.close, color: Colors.red),
@@ -83,7 +82,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         } else {
           // Handle other errors
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
                 children: [
                   Icon(Icons.close, color: Colors.red),
@@ -106,7 +105,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         // Handle other errors
         print(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
               children: [
                 Icon(Icons.close, color: Colors.red),

@@ -5,7 +5,6 @@ import 'package:Emon/screens/recovery_screen.dart'; // Import your recovery scre
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Emon/screens/SplashScreen.dart';
-import 'package:flutter/services.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -59,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     children: <TextSpan>[
                       TextSpan(
-                        text: firstName + ' !',
+                        text: '$firstName !',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18.0,
