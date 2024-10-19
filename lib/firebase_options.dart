@@ -6,14 +6,6 @@ import 'package:flutter/foundation.dart'
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -48,6 +40,8 @@ class DefaultFirebaseOptions {
     authDomain: 'emoniot-fb5ce.firebaseapp.com',
     storageBucket: 'emoniot-fb5ce.appspot.com',
     measurementId: 'G-ZD8WTMG7LY',
+    databaseURL:
+        'https://emoniot-fb5ce-default-rtdb.asia-southeast1.firebasedatabase.app/', // <-- Add the databaseURL here
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -56,6 +50,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '434793832350',
     projectId: 'emoniot-fb5ce',
     storageBucket: 'emoniot-fb5ce.appspot.com',
+    databaseURL:
+        'https://emoniot-fb5ce-default-rtdb.asia-southeast1.firebasedatabase.app/', // <-- Add the databaseURL here
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -65,6 +61,8 @@ class DefaultFirebaseOptions {
     projectId: 'emoniot-fb5ce',
     storageBucket: 'emoniot-fb5ce.appspot.com',
     iosBundleId: 'com.example.emonappV1',
+    databaseURL:
+        'https://emoniot-fb5ce-default-rtdb.asia-southeast1.firebasedatabase.app/', // <-- Add the databaseURL here
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -74,6 +72,8 @@ class DefaultFirebaseOptions {
     projectId: 'emoniot-fb5ce',
     storageBucket: 'emoniot-fb5ce.appspot.com',
     iosBundleId: 'com.example.emonappV1',
+    databaseURL:
+        'https://emoniot-fb5ce-default-rtdb.asia-southeast1.firebasedatabase.app/', // <-- Add the databaseURL here
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -84,5 +84,7 @@ class DefaultFirebaseOptions {
     authDomain: 'emoniot-fb5ce.firebaseapp.com',
     storageBucket: 'emoniot-fb5ce.appspot.com',
     measurementId: 'G-NHB3PHH3XP',
+    databaseURL:
+        'https://emoniot-fb5ce-default-rtdb.asia-southeast1.firebasedatabase.app/', // <-- Add the databaseURL here
   );
 }

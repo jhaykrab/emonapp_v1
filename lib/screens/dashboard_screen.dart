@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart'; // Import Firebase Database
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -10,14 +11,33 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isApplianceOn = false;
 
-  // Variables to store energy data
-  final double _voltage = 0.0;
-  final double _current = 0.0;
-  final double _power = 0.0;
-  final double _totalEnergy = 0.0;
+  // Firebase Realtime Database reference
+  final DatabaseReference _databaseRef =
+      FirebaseDatabase.instance.ref('SensorReadings');
 
-  // Logic to fetch and update energy data could be implemented here
-  // (e.g., using a separate service class for data fetching)
+  // Variables to store energy data
+  double _voltage = 0.0;
+  double _current = 0.0;
+  double _power = 0.0;
+  double _energy = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Listen for changes to all sensor readings
+    _databaseRef.onValue.listen((DatabaseEvent event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+
+      setState(() {
+        _voltage = (data?['voltage'] ?? 0.0).toDouble();
+        _current = (data?['current'] ?? 0.0).toDouble();
+        _power = (data?['power'] ?? 0.0).toDouble();
+        _energy = (data?['energy'] ?? 0.0).toDouble();
+        _isApplianceOn = data?['applianceState'] ?? false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text('Voltage: ${_voltage.toStringAsFixed(2)} V'),
             Text('Current: ${_current.toStringAsFixed(2)} A'),
             Text('Power: ${_power.toStringAsFixed(2)} W'),
-            Text('Total Energy: ${_totalEnergy.toStringAsFixed(2)} kWh'),
+            Text('Total Energy: ${_energy.toStringAsFixed(2)} kWh'),
 
             // Add charts (e.g., using fl_chart or syncfusion_flutter_charts)
             // ... (your code for charts)
@@ -49,7 +69,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onChanged: (value) {
                     setState(() {
                       _isApplianceOn = value;
-                      // Removed Firebase functionality here (could be added later for remote control)
+                      // Update Firebase database with the new appliance state
+                      _databaseRef.update({'applianceState': _isApplianceOn});
                     });
                   },
                   activeTrackColor: Colors.green[700],
