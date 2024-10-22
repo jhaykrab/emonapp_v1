@@ -1,7 +1,8 @@
 import 'package:Emon/screens/login_screen.dart'; // Adjust import if needed
-import 'package:Emon/screens/register_devices_screen.dart';
+import 'package:Emon/screens/register_devices_screen.dart'; // Adjust import if needed
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:Emon/services/database.dart'; // Import your DatabaseService
 
 class SignUpScreen extends StatefulWidget {
   static const String routeName = '/signup';
@@ -14,6 +15,22 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
+  final DatabaseService _dbService =
+      DatabaseService(); // Create an instance of DatabaseService
+
+  // Controllers for the text fields
+  TextEditingController firstnameController = TextEditingController();
+  TextEditingController lastnameController = TextEditingController();
+  TextEditingController emailController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
+
+  bool _obscureText = true; // To control password visibility
+
+  // Add focus nodes for the text fields
+  final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _firstNameFocusNode = FocusNode();
+  final FocusNode _lastNameFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
 
   // Function to handle user registration
   Future<void> registration() async {
@@ -21,13 +38,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Get the email and password from the controllers
       String email = emailController.text.trim();
       String password = passwordController.text.trim();
-      String firstname = firstnameController.text.trim();
-      String lastname = lastnameController.text.trim();
+      String firstName = firstnameController.text.trim();
+      String lastName = lastnameController.text.trim();
 
       try {
         // Create user with email and password
         UserCredential userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(email: email, password: password);
+
+        // Get the user's UID
+        String uid = userCredential.user!.uid;
+
+        // Store user data in Firestore using DatabaseService
+        await _dbService.updateUserData(uid, firstName, lastName);
 
         // Display success message with check icon
         ScaffoldMessenger.of(context).showSnackBar(
@@ -60,9 +83,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await Future.delayed(
             const Duration(milliseconds: 1000)); // Adjust delay as needed
 
-        // Navigate to DeviceScreen
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (context) => const DevicesScreen()));
+        // Navigate to DevicesScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DevicesScreen()),
+        );
       } on FirebaseAuthException catch (e) {
         // Handle Firebase Authentication errors
         if (e.code == 'weak-password') {
@@ -132,20 +157,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  bool _obscureText = true; // To control password visibility
-
-  // Add focus nodes for the text fields
-  final FocusNode _emailFocusNode = FocusNode();
-  final FocusNode _firstNameFocusNode = FocusNode();
-  final FocusNode _lastNameFocusNode = FocusNode();
-  final FocusNode _passwordFocusNode = FocusNode();
-
-  // Controllers for the text fields
-  TextEditingController firstnameController = TextEditingController();
-  TextEditingController lastnameController = TextEditingController();
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -164,7 +175,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // "Let's Get Started!" Text
                   const Text(
                     "Let's Get Started!",
                     style: TextStyle(
@@ -176,7 +186,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Logo - You might want to use a different image here
                   Image.asset(
                     'assets/staticimgs/mobile-login-concept-illustration.png',
                     height: 200.0,
@@ -388,7 +397,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           if (!RegExp(
                                   r'^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[!@#\$&*~]).{8,}$')
                               .hasMatch(value)) {
-                            return 'Password must have at least:\n- one uppercase, one lowercase, \n- one number, and one special character. \n- Minimum 8 characters. \n (e.g: J@kecasundo15)'; // Return a String error message
+                            return 'Password must have at least:\n- one uppercase, one lowercase, \n- one number, and one special character. \n- Minimum 8 characters.';
                           }
                           return null;
                         },

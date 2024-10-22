@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Emon/screens/dashboard_screen.dart';
 import 'package:Emon/screens/signup_screen.dart';
 import 'package:Emon/screens/recovery_screen.dart'; // Import your recovery screen
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Emon/screens/SplashScreen.dart';
+import 'package:Emon/services/database.dart'; // Import your DatabaseService
+import 'package:Emon/models/user_data.dart'; // Import your UserData model
+// import 'package:google_sign_in/google_sign_in.dart'; // Removed
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +18,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _firstName = "User"; // Default placeholder
   String email = "", password = "";
 
   TextEditingController emailController = TextEditingController();
@@ -26,6 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
 
+  // Google Sign-In instance removed
+  // final GoogleSignIn _googleSignIn = GoogleSignIn(
+  //   clientId:
+  //       '198738001480-nj4l1ctj7mn2grcirng56igs230l7ivj.apps.googleusercontent.com',
+  // );
+
   // Function to handle user login
   Future<void> userLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -37,9 +50,18 @@ class _LoginScreenState extends State<LoginScreen> {
           password: passwordController.text.trim(),
         );
 
-        // Get the user's first name (assuming you have a way to store it)
-        // You'll need to adapt this based on how you store user data
-        String firstName = userCredential.user!.displayName ?? "User";
+        // Fetch the user's UID
+        String uid = userCredential.user!.uid;
+
+        // Fetch the user's first name from Firestore
+        DocumentSnapshot<Map<String, dynamic>> userDoc =
+            await _firestore.collection('users').doc(uid).get();
+
+        // Check if the document exists and fetch the first name
+        if (userDoc.exists && userDoc.data() != null) {
+          Map<String, dynamic>? userData = userDoc.data();
+          _firstName = userData?['firstName'] ?? "User";
+        }
 
         // Show success SnackBar with the user's first name and checkmark icon
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(width: 8),
                 RichText(
                   text: TextSpan(
-                    text: 'Welcome back, ',
+                    text: 'Welcome back ',
                     style: const TextStyle(
                       color: Color.fromARGB(255, 54, 83, 56),
                       fontSize: 16.0,
@@ -58,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     children: <TextSpan>[
                       TextSpan(
-                        text: '$firstName !',
+                        text: '$_firstName!',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18.0,
@@ -279,6 +301,76 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
+
+  // Function to handle Google Sign-In removed
+  // Future<void> _signInWithGoogle() async {
+  //   try {
+  //     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+  //     final GoogleSignInAuthentication? googleAuth =
+  //         await googleUser?.authentication;
+
+  //     final credential = GoogleAuthProvider.credential(
+  //       accessToken: googleAuth?.accessToken,
+  //       idToken: googleAuth?.idToken,
+  //     );
+
+  //     UserCredential userCredential =
+  //         await FirebaseAuth.instance.signInWithCredential(credential);
+
+  //     // Get the user's first name
+  //     String firstName = userCredential.user!.displayName ?? "User";
+
+  //     // Show success SnackBar
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Row(
+  //           children: [
+  //             const Icon(Icons.check_circle, color: Colors.green),
+  //             const SizedBox(width: 8),
+  //             Text('Welcome, $firstName!'),
+  //           ],
+  //         ),
+  //         backgroundColor: const Color.fromARGB(255, 193, 223, 194),
+  //         behavior: SnackBarBehavior.floating,
+  //         margin: const EdgeInsets.only(
+  //           top: 0.0,
+  //         ),
+  //       ),
+  //     );
+
+  //     // Navigate to DashboardScreen
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => const DashboardScreen()),
+  //     );
+  //   } catch (error) {
+  //     print(error);
+  //     // Handle sign-in errors
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         backgroundColor: Color.fromARGB(255, 238, 168, 168),
+  //         content: Row(
+  //           children: [
+  //             Icon(Icons.close_rounded, color: Color.fromARGB(255, 63, 19, 16)),
+  //             SizedBox(width: 8),
+  //             Text(
+  //               'Failed to sign in with Google.',
+  //               style: TextStyle(
+  //                 fontSize: 14.0,
+  //                 fontWeight: FontWeight.bold,
+  //                 color: Color.fromARGB(255, 63, 19, 16),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         behavior: SnackBarBehavior.floating,
+  //         margin: EdgeInsets.only(
+  //           top: 0.0,
+  //         ),
+  //       ),
+  //     );
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
