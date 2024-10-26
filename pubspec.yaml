@@ -39,6 +39,10 @@ dependencies:
   firebase_database: ^11.1.4
   google_sign_in: ^6.2.1
   cloud_firestore: ^5.4.4
+  syncfusion_flutter_gauges: ^27.1.56 
+  kdgaugeview: ^1.0.5
+  gauge_indicator: ^0.4.3
+
 
 flutter_icons:
   android: "launcher_icon" 
