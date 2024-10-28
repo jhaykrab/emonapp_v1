@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Firebase Authentication
 import 'package:firebase_database/firebase_database.dart'; // Firebase Realtime Database
 import 'package:Emon/services/database.dart';
-import 'package:kdgaugeview/kdgaugeview.dart';
 import 'package:gauge_indicator/gauge_indicator.dart';
+import 'package:kdgaugeview/kdgaugeview.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,7 +15,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isApplianceOn = false; // Appliance state
-  int _selectedIndex = 2; // Dashboard is selected by default (index 2)
+  int _selectedTabIndex =
+      0; // Selected index for buttons (0: R-Time, 1: Daily, 2: Weekly, 3: Monthly)
+  int _selectedNavbarIndex =
+      2; // Selected index for BottomNavigationBar (Dashboard)
   int _hoveredIndex = -1; // Track hovered item index
 
   final key = GlobalKey<KdGaugeViewState>();
@@ -81,7 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Function to handle bottom navbar item taps
   void _onItemTapped(int index) {
     setState(() {
-      _selectedIndex = index;
+      _selectedNavbarIndex = index;
       // Add navigation logic if necessary for different tabs
     });
   }
@@ -100,62 +103,208 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  // Helper function to build individual gauges
+// Helper function to build individual gauges
   Widget _buildGauge({
     required double value, // Current energy value to show
-    required String title, // Title of the gauge
+    required String title, // Title of the gauge (not used in this example)
     double? gaugeSize, // Optional parameter for gauge size
     double? fontSize, // Optional parameter for font size
   }) {
-    return Center(
-      child: SizedBox(
-        height: gaugeSize ?? 150,
-        width: gaugeSize ?? 150,
-        child: RadialGauge(
-          value: value / 100, // Normalize value to 0-1 range
-          radius: (gaugeSize ?? 150) / 2, // Set radius based on gaugeSize
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedRadialGauge(
+          duration: const Duration(seconds: 1),
+          curve: Curves.elasticOut,
+          radius: 180,
+          key: key,
+          value: value, // Use the provided 'value' for the gauge
+
           axis: GaugeAxis(
-            axisLabelStyle: TextStyle(fontSize: 12), // Style for axis labels
-            ticks: [
-              GaugeTick(value: 0, length: 0.1), // Customize tick length here
-              GaugeTick(value: 25, length: 0.15),
-              GaugeTick(value: 50, length: 0.2),
-              GaugeTick(value: 75, length: 0.15),
-              GaugeTick(value: 100, length: 0.1),
-            ],
-            pointers: [
-              GaugePointer.needle(
-                width: 2,
-                pointerOffset: 0.2, // Adjust needle length indirectly
-                color: Colors.black,
-              ),
-            ],
-            // Use axis to customize the gauge fill
-            axisLineStyle: GaugeAxisLineStyle(
-              thickness: 15, // Set the thickness of the gauge line
-              gradient: SweepGradient(
+            min: 0,
+            max: 18,
+            degrees: 180,
+            style: const GaugeAxisStyle(
+              thickness: 20,
+              background: Color(0xFFDFE2EC),
+              segmentSpacing: 4,
+            ),
+            progressBar: GaugeProgressBar.rounded(
+              color: null,
+              gradient: const GaugeAxisGradient(
                 colors: [
-                  const Color.fromARGB(255, 46, 54, 45),
-                  const Color.fromARGB(255, 72, 100, 68),
-                  const Color.fromARGB(255, 105, 206, 109),
-                  Colors.yellow,
-                  const Color.fromARGB(255, 233, 80, 33),
+                  Color.fromARGB(255, 69, 204, 73),
+                  Color.fromARGB(255, 202, 60, 41)
                 ],
               ),
             ),
           ),
-          center: Text(
-            '${value.toStringAsFixed(2)} kWh',
-            style: TextStyle(
-              fontSize: fontSize ?? 24,
-              fontWeight: FontWeight.bold,
+        ), // AnimatedRadialGauge
+        Column(
+          // Use a Column to arrange the Text widgets
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 30),
+            Text(
+              'Today',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color.fromARGB(255, 72, 100, 68),
+              ),
             ),
-          ),
+            Row(
+              // Wrap value and kWh in a Row
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${value.toStringAsFixed(1)}',
+                  style: TextStyle(
+                    fontSize: 46,
+                    fontWeight: FontWeight.bold,
+                    color: value >= 18
+                        ? Colors.red
+                        : value >= 15
+                            ? Colors.deepOrangeAccent
+                            : value >= 12
+                                ? const Color.fromARGB(255, 245, 179, 93)
+                                : value >= 9
+                                    ? const Color.fromARGB(255, 150, 221, 36)
+                                    : value >= 6
+                                        ? const Color.fromARGB(
+                                            255, 131, 223, 78)
+                                        : value >= 3
+                                            ? const Color.fromARGB(
+                                                255, 132, 247, 79)
+                                            : Colors.green, // Conditional color
+                  ),
+                ),
+
+                SizedBox(width: 4), // Add some spacing between value and kWh
+                Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    'kWh', // Text next to the value
+                    style: TextStyle(
+                      fontSize: 46,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10), // Add space for the consumption message
+            // Conditional text for energy consumption message
+            Text(
+              value == 0.00
+                  ? 'No Energy Consumed' // Condition for 0 kWh
+                  : value <= 6
+                      ? 'Low Energy Consumption'
+                      : value > 6 && value <= 9
+                          ? 'Average Energy Consumption'
+                          : value > 9 && value <= 12
+                              ? 'High Energy Consumption'
+                              : 'Extremely High Consumption',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+                color: value == 0 // Color for 0 kWh (you can customize this)
+                    ? Colors.grey
+                    : value <= 6
+                        ? Colors.green
+                        : value > 6 && value <= 9
+                            ? const Color.fromARGB(255, 115, 180, 9)
+                            : value > 9 && value <= 12
+                                ? Colors.orange
+                                : Colors.red,
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 160,
+          left: 30,
+          child: Text('0', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 102,
+          left: 48,
+          child: Text('3', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 45,
+          left: 99,
+          child: Text('6', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 24,
+          left: 173,
+          child: Text('9', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 45,
+          left: 243,
+          child: Text('12', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 102,
+          left: 293,
+          child: Text('15', style: TextStyle(fontSize: 16)),
+        ),
+        Positioned(
+          top: 160,
+          left: 310,
+          child: Text('18', style: TextStyle(fontSize: 16)),
+        ),
+      ], // End of Stack children
+    ); // Stack
+  } // _buildGauge
+
+  // Helper function to build time selection buttons
+  Widget _buildTimeButton(String label, int index) {
+    final isSelected =
+        _selectedTabIndex == index; // Check if button is selected
+
+    return OutlinedButton(
+      onPressed: () {
+        setState(() {
+          _selectedTabIndex = index;
+          // Animate to the selected page
+          _pageController.animateToPage(
+            index,
+            duration: Duration(milliseconds: 300), // Adjust animation duration
+            curve: Curves.easeInOut,
+          );
+        });
+      },
+      style: OutlinedButton.styleFrom(
+        backgroundColor: isSelected
+            ? const Color.fromARGB(255, 72, 100, 68) // Dark green when selected
+            : Colors.transparent,
+        side: BorderSide(
+          color: const Color.fromARGB(255, 72, 100, 68), // Green outline
+          width: 2.0,
+        ),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.normal,
+          color: isSelected
+              ? Colors.white
+              : const Color.fromARGB(255, 72, 100, 68),
         ),
       ),
     );
   }
 
+  // PageController to control the PageView
+  final _pageController = PageController();
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -236,13 +385,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               SizedBox(height: 50),
 
-              _buildGauge(
-                value: _energy, // Reflects real-time energy reading
-                title: 'Energy',
-                gaugeSize: 250,
-                fontSize: 54,
+              // Gauge
+              Center(
+                child: _buildGauge(
+                  value: _energy,
+                  title: '',
+                  gaugeSize: 250,
+                  fontSize: 54,
+                ),
               ),
 
+              SizedBox(height: 20), // Space above buttons
+
+              // Time selection buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildTimeButton('R-Time', 0),
+                  SizedBox(width: 16), // Space between buttons
+                  _buildTimeButton('Daily', 1),
+                  SizedBox(width: 16),
+                  _buildTimeButton('Weekly', 2),
+                  SizedBox(width: 16),
+                  _buildTimeButton('Monthly', 3),
+                  SizedBox(width: 16),
+                ],
+              ),
+
+              SizedBox(height: 20), // Space between buttons and content
+
+              // PageView for swipeable content
+              SizedBox(
+                height: 400, // Set a fixed height for the PageView
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
+                  children: [
+                    // R-Time Content
+                    Container(), // Empty container for R-Time (gauge is already displayed)
+
+                    // Daily Content
+                    Center(child: Text('Daily Page')),
+
+                    // Weekly Content
+                    Center(child: Text('Weekly Page')),
+
+                    // Monthly Content
+                    Center(child: Text('Monthly Page')),
+                  ],
+                ),
+              ),
+              SizedBox(height: 50),
               // Toggle button to control the appliance
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -296,17 +493,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onExit: (_) => _onItemExit(),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 100),
-                    padding: EdgeInsets.all(_selectedIndex == index
+                    padding: EdgeInsets.all(_selectedNavbarIndex == index
                         ? 6.0
                         : _hoveredIndex == index
                             ? 6.0
                             : 2.0), // Increase padding when selected
                     decoration: BoxDecoration(
-                      color: _selectedIndex == index
+                      color: _selectedNavbarIndex == index
                           ? const Color.fromARGB(255, 90, 105, 91)
                           : Colors.transparent,
                       shape: BoxShape.circle,
-                      boxShadow: _selectedIndex == index
+                      boxShadow: _selectedNavbarIndex == index
                           ? [
                               BoxShadow(
                                 color: const Color.fromARGB(255, 90, 105, 91)
@@ -318,7 +515,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ]
                           : [],
                     ),
-                    transform: _selectedIndex == index
+                    transform: _selectedNavbarIndex == index
                         ? Matrix4.translationValues(0, -12, 0)
                         : Matrix4.identity(),
                     child: Icon(
@@ -331,8 +528,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   : index == 3
                                       ? Icons.analytics
                                       : Icons.settings,
-                      size: _selectedIndex == index ? 30 : 26,
-                      color: _selectedIndex == index ? Color(0xFFe8f5e9) : null,
+                      size: _selectedNavbarIndex == index ? 30 : 26,
+                      color: _selectedNavbarIndex == index
+                          ? Color(0xFFe8f5e9)
+                          : null,
                     ),
                   ),
                 ),
@@ -350,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             selectedLabelStyle: TextStyle(
               color: Colors.white,
             ),
-            currentIndex: _selectedIndex,
+            currentIndex: _selectedNavbarIndex,
             selectedItemColor: Color(0xFFe8f5e9),
             unselectedItemColor: const Color.fromARGB(255, 197, 194, 194),
             onTap: _onItemTapped,
