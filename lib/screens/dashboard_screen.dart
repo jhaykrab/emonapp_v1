@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // Firebase Authentication
 import 'package:firebase_database/firebase_database.dart'; // Firebase Realtime Database
 import 'package:Emon/services/database.dart';
 import 'package:gauge_indicator/gauge_indicator.dart';
+import 'package:intl/intl.dart'; // For date formatting
 import 'package:kdgaugeview/kdgaugeview.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -14,6 +15,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  bool _showCheckboxes = false; // Flag to control checkbox visibility
+  List<bool> _selectedDevices = []; // Track selected devices for removal
   bool _isApplianceOn = false; // Appliance state
   int _selectedTabIndex =
       0; // Selected index for buttons (0: R-Time, 1: Daily, 2: Weekly, 3: Monthly)
@@ -35,6 +38,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _current = 0.0;
   double _power = 0.0;
   double _energy = 0.0;
+  int _runtimehr = 0;
+  int _runtimemin = 0;
+  int _runtimesec = 0;
 
   UserData? _userData; // User data fetched from Firestore
 
@@ -76,6 +82,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _current = (data?['current'] ?? 0.0).toDouble();
         _power = (data?['power'] ?? 0.0).toDouble();
         _energy = (data?['energy'] ?? 0.0).toDouble();
+        _runtimehr = (data?['runtimehr'] ?? 0).toInt();
+        _runtimemin = (data?['runtimemin'] ?? 0).toInt();
+        _runtimesec = (data?['runtimesec'] ?? 0).toInt();
         _isApplianceOn = data?['applianceState'] ?? false;
       });
     });
@@ -346,7 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             children: [
               SizedBox(height: 25.0),
-              // Title: Realtime Consumption
+              // Title: Consumption (Dynamically changes based on selected tab)
               Container(
                 padding: EdgeInsets.symmetric(
                     vertical: 8.0,
@@ -370,8 +379,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: const Color.fromARGB(255, 216, 201, 69),
                     ),
                     SizedBox(width: 8.0),
-                    const Text(
-                      "Realtime Consumption",
+                    Text(
+                      _selectedTabIndex == 0
+                          ? "Realtime Consumption"
+                          : _selectedTabIndex == 1
+                              ? "Daily Consumption"
+                              : _selectedTabIndex == 2
+                                  ? "Weekly Consumption"
+                                  : "Monthly Consumption",
                       style: TextStyle(
                         fontSize: 16.0,
                         fontWeight: FontWeight.bold,
@@ -385,19 +400,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               SizedBox(height: 50),
 
-              // Gauge
-              Center(
-                child: _buildGauge(
-                  value: _energy,
-                  title: '',
-                  gaugeSize: 250,
-                  fontSize: 54,
-                ),
-              ),
+              // Conditionally render gauge
+              _selectedTabIndex == 0
+                  ? Center(
+                      child: _buildGauge(
+                        value: _energy,
+                        title: '',
+                        gaugeSize: 250,
+                        fontSize: 54,
+                      ),
+                    )
+                  : SizedBox.shrink(),
 
               SizedBox(height: 20), // Space above buttons
 
-              // Time selection buttons
+              // Time selection buttons (placed outside PageView)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -414,6 +431,237 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               SizedBox(height: 20), // Space between buttons and content
 
+              // Device Information and Toggle Container
+              Center(
+                child: Container(
+                  width: 450,
+                  padding: EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(
+                        255, 223, 236, 219), // Light green background
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(8.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3), // changes position of shadow
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Date and Day of the Week
+                      Center(
+                        child: Text(
+                          DateFormat('MMMM d, yyyy - EEEE')
+                              .format(DateTime.now()),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: const Color.fromARGB(
+                                255, 72, 100, 68), // Dark green text
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+
+                      // Labels Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'kWh',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 43),
+                          SizedBox(width: 1),
+                          Text(
+                            'V',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 30),
+                          SizedBox(width: 8),
+                          Text(
+                            'A',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 15),
+                          SizedBox(width: 20),
+                          Text(
+                            'W',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 1),
+                          SizedBox(width: 25),
+                          Text(
+                            'Runtime',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                        ],
+                      ),
+                      SizedBox(height: 4), // Spacing between labels and values
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Icon(
+                            Icons.lightbulb, // Replace with your device icon
+                            size: 40,
+                            color: const Color.fromARGB(255, 72, 100, 68),
+                          ),
+                          SizedBox(width: 20),
+                          Text(
+                            '${_energy.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            '${_voltage.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(
+                              width: 10), // Spacing between voltage and current
+                          Text(
+                            '${_current.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(
+                              width: 10), // Spacing between current and power
+                          Text(
+                            '${_power.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(
+                              width: 10), // Spacing between power and runtime
+                          Text(
+                            '${_runtimehr}: $_runtimemin: $_runtimesec', // Display runtime from database
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 72, 100, 68),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Switch(
+                            value: _isApplianceOn,
+                            onChanged: (value) {
+                              setState(() {
+                                _isApplianceOn = value;
+                                // Update Firebase Realtime Database with the new appliance state
+                                _databaseRef
+                                    .update({'applianceState': _isApplianceOn});
+                              });
+                            },
+                            activeTrackColor: Colors.green[700],
+                            activeColor: Colors.green[900],
+                            inactiveTrackColor: Colors.grey[400],
+                            inactiveThumbColor: Colors.grey[300],
+                          ),
+                          SizedBox(width: 16),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    title: Text('Delete Device'),
+                                    content: Text(
+                                        'Are you sure you want to delete this device?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context)
+                                              .pop(); // Close the dialog
+                                        },
+                                        child: Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          // TODO: Implement device deletion logic here
+                                          // Remove the device from your data source
+                                          // Update the UI to reflect the deletion
+                                          Navigator.of(context)
+                                              .pop(); // Close the dialog
+                                        },
+                                        child: Text('Confirm'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 24), // Increased spacing
+                      // Add and Remove Device Buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              // TODO: Implement Add Device functionality
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  const Color.fromARGB(255, 54, 83, 56),
+                            ),
+                            child: Text(
+                              'Add a Device',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 20), // Space above buttons
+
               // PageView for swipeable content
               SizedBox(
                 height: 400, // Set a fixed height for the PageView
@@ -429,38 +677,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(), // Empty container for R-Time (gauge is already displayed)
 
                     // Daily Content
-                    Center(child: Text('Daily Page')),
+                    Center(child: Text('This is Daily Page')),
 
                     // Weekly Content
-                    Center(child: Text('Weekly Page')),
+                    Center(child: Text('This is Weekly Page')),
 
                     // Monthly Content
-                    Center(child: Text('Monthly Page')),
+                    Center(child: Text('This is Monthly Page')),
                   ],
                 ),
-              ),
-              SizedBox(height: 50),
-              // Toggle button to control the appliance
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_isApplianceOn ? 'Appliance On' : 'Appliance Off'),
-                  const SizedBox(width: 10),
-                  Switch(
-                    value: _isApplianceOn,
-                    onChanged: (value) {
-                      setState(() {
-                        _isApplianceOn = value;
-                        // Update Firebase Realtime Database with the new appliance state
-                        _databaseRef.update({'applianceState': _isApplianceOn});
-                      });
-                    },
-                    activeTrackColor: Colors.green[700],
-                    activeColor: Colors.green[900],
-                    inactiveTrackColor: Colors.grey[400],
-                    inactiveThumbColor: Colors.grey[300],
-                  ),
-                ],
               ),
             ],
           ),
