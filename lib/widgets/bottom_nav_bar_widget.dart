@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:Emon/screens/history_screen.dart';
+import 'package:Emon/screens/dashboard_screen.dart';
+import 'package:Emon/screens/appliance_list.dart';
 
 class BottomNavBarWidget extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemTapped;
 
   const BottomNavBarWidget({
-    Key? key,
+    super.key,
     required this.selectedIndex,
     required this.onItemTapped,
-  }) : super(key: key);
+  });
 
   @override
   _BottomNavBarWidgetState createState() => _BottomNavBarWidgetState();
@@ -103,7 +106,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
               label: (index == 0
                   ? 'Profile'
                   : index == 1
-                      ? 'Devices'
+                      ? 'Appliances'
                       : index == 2
                           ? 'Dashboard'
                           : index == 3
@@ -117,7 +120,33 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
           currentIndex: widget.selectedIndex,
           selectedItemColor: Color(0xFFe8f5e9),
           unselectedItemColor: const Color.fromARGB(255, 197, 194, 194),
-          onTap: widget.onItemTapped,
+          onTap: (index) {
+            // Handle navigation when an item is tapped
+            if (index == 2) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DashboardScreen(),
+                ),
+              );
+            } else if (index == 3) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HistoryScreen(),
+                ),
+              );
+            } else if (index == 1) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ApplianceListScreen(), // Now accessible
+                ),
+              );
+            } else {
+              widget.onItemTapped(index);
+            }
+          },
           selectedFontSize: 10,
           unselectedFontSize: 9,
         ),

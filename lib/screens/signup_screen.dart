@@ -49,8 +49,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Get the user's UID
         String uid = userCredential.user!.uid;
 
+        // Create a map to hold all user data
+        Map<String, dynamic> userData = {
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email, // Add email to user_data
+          'password': password, // Add password to user_data
+        };
+
         // Store user data in Firestore using DatabaseService
-        await _dbService.updateUserData(uid, firstName, lastName);
+        await _dbService.updateUserData(uid, userData);
 
         // Display success message with check icon
         ScaffoldMessenger.of(context).showSnackBar(

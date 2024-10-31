@@ -1,8 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-// Import for potential system interactions
-
-// Import DashboardScreen if needed (replace with your actual path)
-// import 'package:Emon/screens/dashboard_screen.dart';
+import 'package:Emon/screens/appliance_list.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart'; // QR code scanner
+import 'package:wifi_scan/wifi_scan.dart'; // Wi-Fi scanning
 
 class SetupApplianceScreen extends StatefulWidget {
   const SetupApplianceScreen({super.key});
@@ -27,13 +28,100 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   ];
   IconData? _selectedApplianceIcon;
 
+  int _deviceCount = 1;
+
   // List of String values for time units
   final List<String> _timeUnits = ['hrs', 'min', 'sec'];
   String? _selectedTimeUnit;
 
+  // TextEditingController for max usage limit
+  final _maxUsageLimitController = TextEditingController();
+
   // Focus nodes for text fields
   final FocusNode _applianceNameFocusNode = FocusNode();
   final FocusNode _maxUsageLimitFocusNode = FocusNode();
+
+  Future<void> _saveApplianceData() async {
+    if (_formKey.currentState!.validate()) {
+      print("Form is valid!"); // Debugging: Check if validation passes
+
+      // Get the current user
+      User? user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        print("User UID: ${user.uid}"); // Debugging: Check if user is logged in
+
+        // Access Firestore
+        FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+        // Create a map with the appliance data
+        Map<String, dynamic> applianceData = {
+          'icon': _selectedApplianceIcon?.codePoint,
+          'name': _applianceNameController.text,
+          'maxUsageLimit': double.tryParse(_maxUsageLimitController.text) ??
+              0.0, // Use _maxUsageLimitController.text
+
+          'unit': _selectedTimeUnit,
+          'isOn': false, // Initially, the appliance is off
+          'isRunning': false, // Initially, the appliance is not running
+        };
+
+        try {
+          // Add appliance data to Firestore under the user's UID in 'registered_appliances' subcollection
+          await firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('registered_appliances')
+              .add(applianceData);
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${_applianceNameController.text} has been set successfully!',
+                style: const TextStyle(
+                  color: Color.fromARGB(255, 54, 83, 56),
+                ),
+              ),
+              backgroundColor: const Color.fromARGB(255, 193, 223, 194),
+            ),
+          );
+
+          // Navigate to ApplianceListScreen after successful save
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ApplianceListScreen()),
+          );
+        } catch (e) {
+          // Handle errors
+          print(
+              'Error saving appliance data: $e'); // Print the error to the console
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save appliance data.'),
+            ),
+          );
+        }
+      } else {
+        // Handle the case where the user is not logged in
+        print('User is not logged in!');
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Not Logged In"),
+            content: const Text("Please log in to save appliances."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +168,57 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                     width: 250.0,
                   ),
                   const SizedBox(height: 16),
+
+                  // Device Number Display
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32.0, vertical: 8),
+                    child: SizedBox(
+                      width: 275,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: TextEditingController(
+                                  text: 'Device $_deviceCount'),
+                              readOnly: true, // Make it non-editable
+                              decoration: InputDecoration(
+                                labelText: 'Device Number',
+                                labelStyle: TextStyle(
+                                  fontSize: 13,
+                                  color: _applianceNameFocusNode.hasFocus
+                                      ? const Color.fromARGB(255, 54, 83, 56)
+                                      : const Color.fromARGB(255, 6, 17, 8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 8.0, horizontal: 16.0),
+                                border: OutlineInputBorder(
+                                  borderSide:
+                                      BorderSide(color: Colors.green.shade800),
+                                ),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Color.fromARGB(255, 54, 83, 56),
+                                    width: 2.0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              // Add your Wi-Fi scanning logic here later
+                              print('Wi-Fi button pressed!');
+                            },
+                            icon: const Icon(
+                              Icons.wifi,
+                              color: Color.fromARGB(255, 54, 83, 56),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   // Appliance Name and Icon Dropdown (Combined)
                   Padding(
@@ -145,6 +284,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                       child: IntrinsicHeight(
                         child: TextFormField(
                           focusNode: _maxUsageLimitFocusNode,
+                          controller: _maxUsageLimitController,
                           cursorColor: const Color.fromARGB(255, 54, 83, 56),
                           decoration: InputDecoration(
                             labelText: 'Set Max Usage Limit',
@@ -201,35 +341,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
                   // Save Button
                   ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        // Process the form data
-                        // You can access the selected values like this:
-                        // _selectedApplianceIcon
-                        // _selectedTimeUnit
-                        // ... other form field values
-                        String applianceName = _applianceNameController.text;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '$applianceName has been set successfully!',
-                              style: const TextStyle(
-                                color: Color.fromARGB(255, 54, 83, 56),
-                              ),
-                            ),
-                            backgroundColor:
-                                const Color.fromARGB(255, 193, 223, 194),
-                          ),
-                        );
-
-                        // Navigate to the dashboard screen after successful save
-                        // Ensure that you have defined DashboardScreen and imported it correctly
-                        // Navigator.pushReplacement(
-                        //   context,
-                        //   MaterialPageRoute(builder: (context) => DashboardScreen()),
-                        // );
-                      }
-                    },
+                    onPressed: _saveApplianceData, // Call the save function
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                       padding: const EdgeInsets.symmetric(

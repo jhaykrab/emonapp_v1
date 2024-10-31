@@ -170,7 +170,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                 ),
                 SizedBox(width: 10), // Spacing between voltage and current
                 Text(
-                  '${widget.current.toStringAsFixed(1)}',
+                  '${widget.current.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

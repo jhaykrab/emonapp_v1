@@ -8,6 +8,7 @@ import 'package:Emon/widgets/time_button_widget.dart';
 import 'package:Emon/widgets/device_info_widget.dart';
 import 'package:Emon/widgets/app_bar_widget.dart';
 import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
+import 'package:Emon/screens/history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -193,6 +194,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   SizedBox(width: 16),
                 ],
+              ),
+
+              SizedBox(height: 50),
+
+              // View History Button
+              ElevatedButton(
+                onPressed: () {
+                  // Navigate to HistoryScreen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => HistoryScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 54, 83, 56),
+                  minimumSize: Size(180, 40),
+                  padding: EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                child: Text(
+                  'View History',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.white,
+                  ),
+                ),
               ),
 
               SizedBox(height: 20),
