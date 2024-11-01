@@ -52,7 +52,7 @@ class GaugeWidget extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${value.toStringAsFixed(1)}',
+                  '${value.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 46,
                     fontWeight: FontWeight.bold,
@@ -134,6 +134,7 @@ class GaugeWidget extends StatelessWidget {
           left: 173,
           child: Text('9', style: TextStyle(fontSize: 16)),
         ),
+        SizedBox(height: 20),
         Positioned(
           top: 45,
           left: 243,
