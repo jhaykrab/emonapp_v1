@@ -58,9 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
             await _firestore.collection('users').doc(uid).get();
 
         // Check if the document exists and fetch the first name
-        if (userDoc.exists && userDoc.data() != null) {
-          Map<String, dynamic>? userData = userDoc.data();
-          _firstName = userData?['firstName'] ?? "User";
+        if (userDoc.exists) {
+          // Access the 'user_data' field and then 'firstName'
+          _firstName = userDoc.get('user_data')['firstName'] ?? "User";
         }
 
         // Show success SnackBar with the user's first name and checkmark icon
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     children: <TextSpan>[
                       TextSpan(
-                        text: '$_firstName!',
+                        text: ' $_firstName!',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18.0,

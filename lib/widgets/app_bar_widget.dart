@@ -29,10 +29,10 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
           ),
           Spacer(),
           IconButton(
-            icon: Icon(Icons.help_outline),
+            icon: Icon(Icons.settings),
             color: Color(0xFFe8f5e9),
             onPressed: () {
-              print("Help button pressed");
+              print("Settings button pressed");
               // Add your help button functionality here
             },
           )

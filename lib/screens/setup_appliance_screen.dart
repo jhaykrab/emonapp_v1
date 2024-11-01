@@ -28,6 +28,12 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   ];
   IconData? _selectedApplianceIcon;
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchDeviceCount(); // Fetch the initial device count from Firestore
+  }
+
   int _deviceCount = 1;
 
   // List of String values for time units
@@ -54,6 +60,69 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         // Access Firestore
         FirebaseFirestore firestore = FirebaseFirestore.instance;
 
+        // Input Validation
+        if (_selectedApplianceIcon == null) {
+          // Show error message for missing icon
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red), // Red warning icon
+                  SizedBox(width: 8),
+                  Text(
+                    'Please choose an icon.',
+                    style: TextStyle(
+                      color: Color.fromARGB(255, 114, 18, 18), // Dark red text
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.transparent, // Transparent background
+              elevation: 0, // No shadow
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: Colors.red, width: 2), // Red outline
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+          return; // Stop execution if icon is not selected
+        }
+        SizedBox(height: 30);
+
+        if (_selectedTimeUnit == null) {
+          // Show error message for missing time unit
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.warning,
+                      color: const Color.fromARGB(
+                          255, 243, 121, 40)), // Red warning icon
+                  SizedBox(width: 8),
+                  Text(
+                    'Please set a time unit for Max Usage Limit.',
+                    style: TextStyle(
+                      color: Color.fromARGB(255, 114, 18, 18), // Dark red text
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.transparent, // Transparent background
+              elevation: 0, // No shadow
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: Colors.red, width: 2), // Red outline
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+
+          return; // Stop execution if time unit is not selected
+        }
+
+        SizedBox(height: 30);
+
         // Create a map with the appliance data
         Map<String, dynamic> applianceData = {
           'icon': _selectedApplianceIcon?.codePoint,
@@ -64,6 +133,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           'unit': _selectedTimeUnit,
           'isOn': false, // Initially, the appliance is off
           'isRunning': false, // Initially, the appliance is not running
+          'deviceNumber': 'Device $_deviceCount', // Add device number to data
         };
 
         try {
@@ -119,6 +189,28 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
             ],
           ),
         );
+      }
+    }
+  }
+
+  // Function to fetch the device count from Firestore
+  Future<void> _fetchDeviceCount() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        QuerySnapshot snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('registered_appliances')
+            .get();
+
+        setState(() {
+          _deviceCount = snapshot.docs.length +
+              1; // Set _deviceCount based on existing appliances
+        });
+      } catch (e) {
+        print('Error fetching device count: $e');
+        // Handle the error appropriately, e.g., show an error message
       }
     }
   }

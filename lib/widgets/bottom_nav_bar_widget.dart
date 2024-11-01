@@ -95,7 +95,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
                                 ? Icons.dashboard
                                 : index == 3
                                     ? Icons.analytics
-                                    : Icons.settings,
+                                    : Icons.help_outline,
                     size: widget.selectedIndex == index ? 30 : 26,
                     color: widget.selectedIndex == index
                         ? Color(0xFFe8f5e9)
@@ -111,7 +111,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
                           ? 'Dashboard'
                           : index == 3
                               ? 'History'
-                              : 'Settings'),
+                              : 'Help'),
             ),
           ),
           selectedLabelStyle: TextStyle(

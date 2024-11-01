@@ -188,7 +188,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                 ),
                 SizedBox(width: 10), // Spacing between power and runtime
                 Text(
-                  '${widget.runtimehr}: ${widget.runtimemin}: ${widget.runtimesec}', // Display runtime from database
+                  '${widget.runtimehr}h ${widget.runtimemin}m ${widget.runtimesec}s', // Display runtime from database
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
