@@ -46,7 +46,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
         ),
       ),
       child: SizedBox(
-        height: 70,
+        height: 80,
         child: BottomNavigationBar(
           backgroundColor: Colors.transparent,
           elevation: 4,
@@ -96,7 +96,9 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
                                 : index == 3
                                     ? Icons.analytics
                                     : Icons.help_outline,
-                    size: widget.selectedIndex == index ? 30 : 26,
+                    size: widget.selectedIndex == index
+                        ? 36
+                        : 32, // Increased icon sizes
                     color: widget.selectedIndex == index
                         ? Color(0xFFe8f5e9)
                         : null,
@@ -147,8 +149,8 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
               widget.onItemTapped(index);
             }
           },
-          selectedFontSize: 10,
-          unselectedFontSize: 9,
+          selectedFontSize: 12, // Increased font size for selected label
+          unselectedFontSize: 11, // Increased font size for unselected label
         ),
       ),
     );

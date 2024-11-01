@@ -1,8 +1,7 @@
+import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math; // Import math library for animation
-
-import 'package:Emon/screens/add_device_screen.dart';
 
 class DeviceInfoWidget extends StatefulWidget {
   final double energy;
@@ -152,7 +151,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                 ),
                 SizedBox(width: 20),
                 Text(
-                  '${widget.energy.toStringAsFixed(1)}',
+                  '${widget.energy.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -277,7 +276,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => DeviceConfigurationScreen(),
+                        builder: (context) => SetupApplianceScreen(),
                       ),
                     );
                   },

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Emon/screens/register_devices_screen.dart';
+import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:Emon/screens/SplashScreenLogo.dart';
 import 'package:Emon/screens/SplashScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:Emon/screens/login_screen.dart ';
 import 'firebase_options.dart';
 
 // Import your firebase_options.dart file
@@ -30,7 +31,8 @@ class MyApp extends StatelessWidget {
       routes: {
         SplashScreenLogo.routeName: (context) => const SplashScreenLogo(),
         SplashScreen.routeName: (context) => const SplashScreen(),
-        DevicesScreen.routeName: (context) => const DevicesScreen(),
+        SetupApplianceScreen.routeName: (context) => SetupApplianceScreen(),
+        '/LoginScreen': (context) => const LoginScreen(),
       },
     );
   }

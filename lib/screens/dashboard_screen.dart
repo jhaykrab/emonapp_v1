@@ -105,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
       body: Container(
-        color: Colors.white,
+        color: const Color.fromARGB(255, 243, 250, 244),
         child: SingleChildScrollView(
           child: Column(
             children: [

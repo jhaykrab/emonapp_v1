@@ -6,7 +6,7 @@ import 'package:qr_code_scanner/qr_code_scanner.dart'; // QR code scanner
 import 'package:wifi_scan/wifi_scan.dart'; // Wi-Fi scanning
 
 class SetupApplianceScreen extends StatefulWidget {
-  const SetupApplianceScreen({super.key});
+  static const String routeName = '/setupAppliance';
 
   @override
   State<SetupApplianceScreen> createState() => _SetupApplianceScreenState();
@@ -224,7 +224,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           color: const Color.fromARGB(255, 72, 100, 68),
           onPressed: () => Navigator.pop(context), // Navigate back
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Color.fromARGB(255, 243, 250, 244),
         elevation: 0,
       ),
       body: Container(

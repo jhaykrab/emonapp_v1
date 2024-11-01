@@ -22,6 +22,10 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
   UserData? _userData;
   bool _isApplianceOn = false; // Track the global appliance state
 
+  // Variables to store runtime values from Realtime Database
+  int _runtimeHours = 0;
+  int _runtimeMinutes = 0;
+  int _runtimeSeconds = 0;
   final DatabaseService _dbService = DatabaseService();
 
   // Realtime Database reference (same path as in DashboardScreen)
@@ -49,6 +53,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     _fetchUserData();
     _fetchApplianceData();
     _listenToSensorReadings();
+    _listenToRuntime();
   }
 
   Future<void> _fetchUserData() async {
@@ -73,6 +78,19 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
 
       setState(() {
         _isApplianceOn = data?['applianceState'] ?? false;
+      });
+    });
+  }
+
+  // Firebase Realtime Database listener for runtime updates
+  void _listenToRuntime() {
+    _databaseRef.onValue.listen((DatabaseEvent event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+
+      setState(() {
+        _runtimeHours = data?['runtimehr'] ?? 0;
+        _runtimeMinutes = data?['runtimemin'] ?? 0;
+        _runtimeSeconds = data?['runtimesec'] ?? 0;
       });
     });
   }
@@ -252,7 +270,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   keyboardType: TextInputType.number, // Allow only numbers
                   onChanged: (value) {
                     // You can add validation here if needed
-                    appliance['deviceNumber'] = '$value';
+                    appliance['deviceNumber'] = 'Device $value';
                   },
                 ),
                 const SizedBox(height: 16),
@@ -506,7 +524,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
       body: Container(
-        color: const Color(0xFFE8F5E9),
+        color: Color.fromARGB(255, 243, 250, 244),
         child: _appliances.isEmpty
             ? const Center(
                 child: Text('No appliances set up yet.'),
@@ -532,76 +550,113 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                         ),
                       ],
                     ),
-                    child: ListTile(
-                      leading: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            IconData(appliance['icon'] ?? 0,
-                                fontFamily: 'MaterialIcons'),
-                            size: 40,
-                            color: const Color.fromARGB(255, 72, 100, 68),
-                          ),
-                          const SizedBox(width: 20),
-                          Icon(
-                            Icons.wifi, // WiFi icon
-                            size: 24,
-                            color: _isApplianceOn ? Colors.green : Colors.grey,
-                          ),
-                          const SizedBox(width: 20),
-                        ],
-                      ),
-                      title: Text(
-                        appliance['name'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${appliance['deviceNumber']}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Constrained Runtime Text
-                          SizedBox(
-                            width: 80,
-                            child: Text(
-                              '${appliance['runtimehr'] ?? 0}h ${appliance['runtimemin'] ?? 0}m ${appliance['runtimesec'] ?? 0}s',
-                              style: const TextStyle(fontSize: 14),
-                            ),
+                          // Column for Appliance Info
+                          Row(
+                            // Changed from Column to Row
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Appliance Icon
+                              Icon(
+                                IconData(appliance['icon'] ?? 0,
+                                    fontFamily: 'MaterialIcons'),
+                                size: 40,
+                                color: const Color.fromARGB(255, 72, 100, 68),
+                              ),
+                              const SizedBox(width: 16), // Added spacing
+                              // Wi-Fi Icon
+                              Icon(
+                                Icons.wifi,
+                                size: 24,
+                                color:
+                                    _isApplianceOn ? Colors.green : Colors.grey,
+                              ),
+                              const SizedBox(width: 16), // Added spacing
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    appliance['name'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${appliance['deviceNumber']}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // Constrained Runtime Text
+                                  SizedBox(
+                                    width: 120, // Adjust width as needed
+                                    child: Text(
+                                      '$_runtimeHours\h $_runtimeMinutes\m $_runtimeSeconds\s', // Remove spaces and use \ before units
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                  // Status Text
+                                  Text(
+                                    _isApplianceOn
+                                        ? 'Device Turned On'
+                                        : 'Device Turned Off',
+                                    style: TextStyle(
+                                      color: _isApplianceOn
+                                          ? Colors.green[700]
+                                          : Colors.red,
+                                      fontWeight: FontWeight.normal,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
 
-                          // Toggle Switch (Copied from DashboardScreen)
-                          Switch(
-                            value: _isApplianceOn,
-                            onChanged: (value) {
-                              setState(() {
-                                _isApplianceOn = value;
-                                _databaseRef
-                                    .update({'applianceState': _isApplianceOn});
-                              });
-                            },
-                            activeTrackColor: Colors.green[700],
-                            activeColor: Colors.green[900],
-                            inactiveTrackColor: Colors.grey[400],
-                            inactiveThumbColor: Colors.grey[300],
-                          ),
-                          // Edit and Delete Buttons
-                          Row(
+                          // Column for Toggle, Edit, Delete, and Status
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _editAppliance(index),
+                              // Toggle Switch and Status Row
+                              Row(
+                                children: [
+                                  // Toggle Switch
+                                  Switch(
+                                    value: _isApplianceOn,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _isApplianceOn = value;
+                                        _databaseRef.update(
+                                            {'applianceState': _isApplianceOn});
+                                      });
+                                    },
+                                    activeTrackColor: Colors.green[700],
+                                    activeColor: Colors.green[900],
+                                    inactiveTrackColor: Colors.grey[400],
+                                    inactiveThumbColor: Colors.grey[300],
+                                  ),
+                                  const SizedBox(width: 8), // Added spacing
+                                ],
                               ),
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () =>
-                                    _showRemoveConfirmationDialog(index),
+                              const SizedBox(height: 8),
+                              // Edit and Delete Buttons
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () => _editAppliance(index),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () =>
+                                        _showRemoveConfirmationDialog(index),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -627,7 +682,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const SetupApplianceScreen(),
+                      builder: (context) => SetupApplianceScreen(),
                     ),
                   );
                 },
@@ -635,7 +690,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                   foregroundColor: const Color(0xFFe8f5e9),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 16),
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 20),
                   textStyle: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -647,14 +702,13 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(width: 8.0),
-                    Text('Add Appliance'),
-                    Icon(Icons.add),
+                    SizedBox(width: 12),
+                    Text('Add an Appliance'),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 50.0),
+            const SizedBox(height: 80),
           ],
         ),
       ),

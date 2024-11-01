@@ -1,8 +1,8 @@
 import 'package:Emon/screens/login_screen.dart'; // Adjust import if needed
-import 'package:Emon/screens/register_devices_screen.dart'; // Adjust import if needed
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Emon/services/database.dart'; // Import your DatabaseService
+import 'package:Emon/screens/setup_appliance_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   static const String routeName = '/signup';
@@ -94,7 +94,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Navigate to DevicesScreen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DevicesScreen()),
+          MaterialPageRoute(builder: (context) => SetupApplianceScreen()),
         );
       } on FirebaseAuthException catch (e) {
         // Handle Firebase Authentication errors
