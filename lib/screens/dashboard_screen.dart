@@ -9,6 +9,7 @@ import 'package:Emon/widgets/device_info_widget.dart';
 import 'package:Emon/widgets/app_bar_widget.dart';
 import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
 import 'package:Emon/screens/history_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0;
   int _selectedNavbarIndex = 2;
   final _pageController = PageController();
+
+  List<Appliance> _appliances = [];
 
   // Firebase
   final DatabaseReference _databaseRef =
@@ -43,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _user = FirebaseAuth.instance.currentUser;
     _fetchUserData();
     _listenToSensorReadings();
+    _fetchApplianceData();
   }
 
   // Function to fetch user data (firstName, lastName) from Firestore
@@ -63,6 +67,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     }
+  }
+
+  // Function to fetch appliance data from Firestore
+  Future<void> _fetchApplianceData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        QuerySnapshot snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('registered_appliances')
+            .get();
+
+        setState(() {
+          _appliances = snapshot.docs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            return Appliance(
+              name: data['name'] ?? '',
+              icon: IconData(data['icon'] ?? 0, fontFamily: 'MaterialIcons'),
+              energy: (data['energy'] ?? 0.0).toDouble(),
+              voltage: (data['voltage'] ?? 0.0).toDouble(),
+              current: (data['current'] ?? 0.0).toDouble(),
+              power: (data['power'] ?? 0.0).toDouble(),
+              runtimehr: (data['runtimehr'] ?? 0).toInt(),
+              runtimemin: (data['runtimemin'] ?? 0).toInt(),
+              runtimesec: (data['runtimesec'] ?? 0).toInt(),
+              isApplianceOn: data['isOn'] ?? false,
+              onToggleChanged: (value) async {
+                // Implement toggle logic for each appliance in Firestore
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('registered_appliances')
+                      .doc(doc.id)
+                      .update({'isOn': value});
+                } catch (e) {
+                  print('Error updating appliance state: $e');
+                  // Handle errors, e.g., show an error message
+                }
+              },
+              documentId: doc.id,
+            );
+          }).toList();
+        });
+      } catch (e) {
+        print('Error fetching appliance data: $e');
+      }
+    }
+  }
+
+  // Function to add a new appliance to the list
+  void _addAppliance(Appliance newAppliance) {
+    setState(() {
+      _appliances.add(newAppliance);
+    });
   }
 
   // Firebase Realtime Database listener for sensor readings
@@ -196,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
 
-              SizedBox(height: 50),
+              SizedBox(height: 30),
 
               // View History Button
               ElevatedButton(
@@ -227,24 +287,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
-              SizedBox(height: 20),
+              SizedBox(height: 5),
 
               // Device Information and Toggle Container
               DeviceInfoWidget(
-                energy: _energy,
-                voltage: _voltage,
-                current: _current,
-                power: _power,
-                runtimehr: _runtimehr,
-                runtimemin: _runtimemin,
-                runtimesec: _runtimesec,
-                isApplianceOn: _isApplianceOn,
-                onToggleChanged: (value) {
-                  setState(() {
-                    _isApplianceOn = value;
-                    _databaseRef.update({'applianceState': _isApplianceOn});
-                  });
-                },
+                appliances: _appliances,
+                onAddAppliance: _addAppliance,
               ),
 
               SizedBox(height: 20),

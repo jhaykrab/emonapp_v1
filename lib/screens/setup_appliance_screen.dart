@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:Emon/screens/appliance_list.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart'; // QR code scanner
 import 'package:wifi_scan/wifi_scan.dart'; // Wi-Fi scanning
+import 'package:flutter/services.dart';
 
 class SetupApplianceScreen extends StatefulWidget {
   static const String routeName = '/setupAppliance';
@@ -127,8 +128,8 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         Map<String, dynamic> applianceData = {
           'icon': _selectedApplianceIcon?.codePoint,
           'name': _applianceNameController.text,
-          'maxUsageLimit': double.tryParse(_maxUsageLimitController.text) ??
-              0.0, // Use _maxUsageLimitController.text
+          'maxUsageLimit': int.tryParse(_maxUsageLimitController.text) ??
+              0, // Use int.tryParse for whole numbers
 
           'unit': _selectedTimeUnit,
           'isOn': false, // Initially, the appliance is off
@@ -418,6 +419,9 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                             ),
                           ),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ], // Allow only digits
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter a max usage limit';

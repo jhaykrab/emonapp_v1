@@ -2,8 +2,13 @@ import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math; // Import math library for animation
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:firebase_auth/firebase_auth.dart';
 
-class DeviceInfoWidget extends StatefulWidget {
+// Define an Appliance class to hold data for each appliance
+class Appliance {
+  final String name; // Add appliance name
+  final IconData icon; // Add appliance icon
   final double energy;
   final double voltage;
   final double current;
@@ -13,9 +18,11 @@ class DeviceInfoWidget extends StatefulWidget {
   final int runtimesec;
   final bool isApplianceOn;
   final ValueChanged<bool> onToggleChanged;
+  final String documentId; // Add documentId
 
-  const DeviceInfoWidget({
-    Key? key,
+  Appliance({
+    required this.name, // Initialize name
+    required this.icon, // Initialize icon
     required this.energy,
     required this.voltage,
     required this.current,
@@ -25,7 +32,17 @@ class DeviceInfoWidget extends StatefulWidget {
     required this.runtimesec,
     required this.isApplianceOn,
     required this.onToggleChanged,
-  }) : super(key: key);
+    required this.documentId,
+  });
+}
+
+class DeviceInfoWidget extends StatefulWidget {
+  final List<Appliance> appliances; // List to hold appliance data
+  final Function(Appliance) onAddAppliance; // Function to add appliances
+
+  const DeviceInfoWidget(
+      {Key? key, required this.appliances, required this.onAddAppliance})
+      : super(key: key);
 
   @override
   _DeviceInfoWidgetState createState() => _DeviceInfoWidgetState();
@@ -59,7 +76,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
         padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 0.0),
         margin: EdgeInsets.only(top: 40.0),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 223, 236, 219),
+          color: const Color.fromARGB(255, 243, 250, 244),
           border: Border.all(
             color: Colors.grey[300]!,
             width: 1.0,
@@ -90,118 +107,10 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
             ),
             SizedBox(height: 12),
 
-            // Row for Appliance Icon/Toggle and Readings/Units/Values
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Column for Appliance Icon and Toggle
-                Column(
-                  children: [],
-                ),
-
-                SizedBox(width: 16), // Spacing between icon/toggle and readings
-
-                // Column for Readings, Units, and Values
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Readings Titles Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(width: 20),
-                          _buildReadingTitle('Energy'),
-                          SizedBox(width: 15),
-                          _buildReadingTitle('Voltage'),
-                          SizedBox(width: 15),
-                          _buildReadingTitle('Current'),
-                          SizedBox(width: 15),
-                          _buildReadingTitle('Power'),
-                          SizedBox(width: 15),
-                          _buildReadingTitle('Runtime'),
-                          SizedBox(width: 40),
-                        ],
-                      ),
-
-                      SizedBox(height: 4), // Reduced spacing
-
-                      // Units Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          SizedBox(width: 80),
-                          _buildUnit('kWh'),
-                          SizedBox(width: 40),
-                          _buildUnit('V'),
-                          SizedBox(width: 40),
-                          _buildUnit('A'),
-                          SizedBox(width: 40),
-                          _buildUnit('W'),
-                          SizedBox(width: 40),
-                          _buildUnit('h:m:s'),
-                          SizedBox(width: 100),
-                        ],
-                      ),
-
-                      SizedBox(height: 8), // Reduced spacing
-
-                      // Values Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Icon(
-                              Icons.lightbulb,
-                              size: 36, // Reduced icon size
-                              color: const Color.fromARGB(255, 72, 100, 68),
-                            ),
-                          ),
-                          _buildReadingValue(widget.energy.toStringAsFixed(2)),
-                          _buildReadingValue(widget.voltage.toStringAsFixed(1)),
-                          _buildReadingValue(widget.current.toStringAsFixed(2)),
-                          _buildReadingValue(widget.power.toStringAsFixed(1)),
-                          _buildReadingValue(
-                              '${widget.runtimehr}:${widget.runtimemin}:${widget.runtimesec}'),
-                          Transform.scale(
-                            scale: 0.8,
-                            child: Switch(
-                              value: widget.isApplianceOn,
-                              onChanged: widget.onToggleChanged,
-                              activeTrackColor: Colors.green[700],
-                              activeColor: Colors.green[900],
-                              inactiveTrackColor: Colors.grey[400],
-                              inactiveThumbColor: Colors.grey[300],
-                            ),
-                          ),
-                          // Delete Icon (conditionally visible with animation)
-                          if (_showDeleteIcon)
-                            AnimatedBuilder(
-                              animation: _animationController,
-                              builder: (context, child) {
-                                return Transform.rotate(
-                                  angle: _animationController.value *
-                                      2 *
-                                      math.pi /
-                                      12,
-                                  child: child,
-                                );
-                              },
-                              child: IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  _showDeleteConfirmationDialog();
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            // Dynamically generate rows for each appliance
+            ...widget.appliances.map((appliance) {
+              return _buildApplianceRow(appliance);
+            }).toList(),
 
             SizedBox(height: 24),
 
@@ -210,35 +119,137 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildElevatedButton(
-                  'Add a Device',
+                  '  Add an Appliance  ',
                   const Color.fromARGB(255, 54, 83, 56),
-                  () {
-                    Navigator.push(
+                  () async {
+                    final newAppliance = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => SetupApplianceScreen(),
                       ),
                     );
-                  },
-                ),
-                _buildElevatedButton(
-                  'Remove a Device',
-                  const Color.fromARGB(255, 202, 67, 67),
-                  () {
-                    setState(() {
-                      _showDeleteIcon = !_showDeleteIcon;
-                      if (_showDeleteIcon) {
-                        _animationController.repeat(reverse: true);
-                      } else {
-                        _animationController.reset();
-                      }
-                    });
+
+                    // Check if newAppliance is not null (user saved an appliance)
+                    if (newAppliance != null && newAppliance is Appliance) {
+                      widget.onAddAppliance(newAppliance);
+                    }
                   },
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Helper function to build a row for each appliance
+  Widget _buildApplianceRow(Appliance appliance) {
+    const int maxNameLength = 10; // Set the maximum name length to display
+
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 223, 236, 219),
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            appliance.icon,
+            size: 36,
+            color: const Color.fromARGB(255, 72, 100, 68),
+          ),
+          SizedBox(width: 16),
+          // Truncated appliance name with hover effect
+          MouseRegion(
+            onEnter: (_) => setState(() {}), // No state change on hover
+            onExit: (_) => setState(() {}), // No state change on exit
+            child: Tooltip(
+              message: appliance.name, // Full name in tooltip
+              preferBelow: false, // Tooltip will be above if it overlaps
+              child: Text(
+                appliance.name.length > maxNameLength
+                    ? '${appliance.name.substring(0, maxNameLength)}...'
+                    : appliance.name,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 40),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Energy: ${appliance.energy.toStringAsFixed(2)} kWh',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+              Text(
+                'Voltage: ${appliance.voltage.toStringAsFixed(1)} V',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+              Text(
+                'Current: ${appliance.current.toStringAsFixed(2)} A',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+              Text(
+                'Power: ${appliance.power.toStringAsFixed(1)} W',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+              Text(
+                'Runtime: ${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: const Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+            ],
+          ),
+
+          Spacer(),
+          Transform.scale(
+            scale: 0.8,
+            child: Switch(
+              value: appliance.isApplianceOn,
+              onChanged: appliance.onToggleChanged,
+              activeTrackColor: Colors.green[700],
+              activeColor: Colors.green[900],
+              inactiveTrackColor: Colors.grey[400],
+              inactiveThumbColor: Colors.grey[300],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.delete, color: Colors.red),
+            onPressed: () {
+              _showDeleteConfirmationDialog(appliance.documentId);
+            },
+          ),
+        ],
       ),
     );
   }
@@ -301,7 +312,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
   }
 
   // Function to show a confirmation dialog before removing a device
-  Future<void> _showDeleteConfirmationDialog() async {
+  Future<void> _showDeleteConfirmationDialog(String documentId) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -340,8 +351,53 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                 'Confirm',
                 style: TextStyle(color: Color.fromARGB(255, 114, 18, 18)),
               ),
-              onPressed: () {
-                // TODO: Implement device deletion logic here
+              onPressed: () async {
+                try {
+                  // Get the current user's UID
+                  User? user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    print('User not logged in!');
+                    return;
+                  }
+
+                  // Delete the document from Firestore
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('registered_appliances')
+                      .doc(documentId)
+                      .delete();
+
+                  // Show a success message (optional)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text(
+                            'Appliance deleted successfully!',
+                            style: TextStyle(
+                              color: Color.fromARGB(
+                                  255, 54, 83, 56), // Dark green text
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Color.fromARGB(
+                          255, 193, 223, 194), // Light green background
+                    ),
+                  );
+
+                  // Remove the appliance from the list
+                  setState(() {
+                    widget.appliances.removeWhere(
+                        (appliance) => appliance.documentId == documentId);
+                  });
+                } catch (e) {
+                  print('Error deleting appliance: $e');
+                  // Handle errors, e.g., show an error message
+                }
                 Navigator.of(context).pop();
               },
             ),
