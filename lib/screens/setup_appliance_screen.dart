@@ -29,6 +29,12 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   ];
   IconData? _selectedApplianceIcon;
 
+// QR Code Scanner variables
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  Barcode? result;
+  QRViewController? controller;
+  final qrTextController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +54,19 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   final FocusNode _applianceNameFocusNode = FocusNode();
   final FocusNode _maxUsageLimitFocusNode = FocusNode();
 
+  // Function to handle the scanned QR code data
+  void _onQRViewCreated(QRViewController controller) {
+    this.controller = controller;
+    controller.scannedDataStream.listen((scanData) {
+      setState(() {
+        result = scanData;
+        // Process the scanned data (result.code) here
+        // For example, extract device number or other information
+        print("Scanned Data: ${result?.code}"); // Print the scanned data
+      });
+    });
+  }
+
   Future<void> _saveApplianceData() async {
     if (_formKey.currentState!.validate()) {
       print("Form is valid!"); // Debugging: Check if validation passes
@@ -60,6 +79,18 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
         // Access Firestore
         FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+/*
+// Access QR code data (if available)
+        if (result != null) {
+          String? scannedData = result!.code;
+          // Use the scannedData to update applianceData
+          // For example:
+          applianceData['deviceNumber'] = scannedData;
+          // Or any other processing based on the scanned data
+        }
+
+*/
 
         // Input Validation
         if (_selectedApplianceIcon == null) {
@@ -225,6 +256,15 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           color: const Color.fromARGB(255, 72, 100, 68),
           onPressed: () => Navigator.pop(context), // Navigate back
         ),
+        title: const Text(
+          'Back',
+          style: TextStyle(
+            fontWeight: FontWeight.bold, // Make the text bold
+            fontSize: 22,
+            fontFamily: 'Rubik',
+            color: Color.fromARGB(255, 72, 100, 68), // Dark green color
+          ),
+        ),
         backgroundColor: Color.fromARGB(255, 243, 250, 244),
         elevation: 0,
       ),
@@ -244,9 +284,9 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   const Text(
-                    "Let's Set Up Your Appliances!",
+                    "Let's Set Up Your Appliance!",
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 24,
                       fontWeight: FontWeight.w800,
                       color: Color.fromARGB(255, 72, 100, 68),
                       fontFamily: 'Rubik',
@@ -254,12 +294,16 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  Image.asset(
-                    'assets/staticimgs/service-technicians.png',
-                    // Replace with appropriate image path
-                    height: 250.0,
-                    width: 250.0,
+                  // QR Code Scanner
+                  SizedBox(
+                    height: 300,
+                    width: 300,
+                    child: QRView(
+                      key: qrKey,
+                      onQRViewCreated: _onQRViewCreated,
+                    ),
                   ),
+
                   const SizedBox(height: 16),
 
                   // Device Number Display
@@ -467,5 +511,11 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose(); // Dispose of the QR code scanner controller
+    super.dispose();
   }
 }

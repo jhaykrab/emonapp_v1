@@ -4,6 +4,8 @@ import 'package:Emon/screens/SplashScreenLogo.dart';
 import 'package:Emon/screens/SplashScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:Emon/screens/login_screen.dart ';
+import 'package:Emon/admin/admin_page_screen.dart'; // Import your AdminPage
+import 'package:Emon/admin/admin_login_screen.dart'; // Import your AdminLoginScreen
 import 'firebase_options.dart';
 
 // Import your firebase_options.dart file
@@ -32,6 +34,8 @@ class MyApp extends StatelessWidget {
         SplashScreenLogo.routeName: (context) => const SplashScreenLogo(),
         SplashScreen.routeName: (context) => const SplashScreen(),
         SetupApplianceScreen.routeName: (context) => SetupApplianceScreen(),
+        AdminPage.routeName: (context) => const AdminPage(),
+        LoginScreenAdmin.routeName: (context) => const LoginScreenAdmin(),
         '/LoginScreen': (context) => const LoginScreen(),
       },
     );

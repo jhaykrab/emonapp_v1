@@ -11,6 +11,7 @@ import 'package:Emon/models/user_data.dart'; // Import your UserData model
 // import 'package:google_sign_in/google_sign_in.dart'; // Removed
 
 class LoginScreen extends StatefulWidget {
+  static const String routeName = '/login';
   const LoginScreen({super.key});
 
   @override
