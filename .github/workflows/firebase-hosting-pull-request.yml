@@ -17,5 +17,5 @@ jobs:
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EMON_C6759 }}
-          projectId: emon-c6759
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EMONIOT_FB5CE }}
+          projectId: emoniot-fb5ce

@@ -27,6 +27,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Appliance> _appliances = [];
 
+  Map<String, IconData> applianceIcons = {
+    'lightbulb': Icons.lightbulb_outline,
+    'fan': Icons.air,
+    'tv': Icons.tv,
+    'refrigerator': Icons.kitchen,
+    // Add more appliance types and icons as needed
+  };
+
   // Firebase
   final DatabaseReference _databaseRef =
       FirebaseDatabase.instance.ref('SensorReadings');
@@ -95,7 +103,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
             return Appliance(
               name: data['name'] ?? '',
-              icon: IconData(data['icon'] ?? 0, fontFamily: 'MaterialIcons'),
+              icon:
+                  applianceIcons[data['applianceType']] ?? Icons.device_unknown,
               energy: (data['energy'] ?? 0.0).toDouble(),
               voltage: (data['voltage'] ?? 0.0).toDouble(),
               current: (data['current'] ?? 0.0).toDouble(),

@@ -29,7 +29,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   ];
   IconData? _selectedApplianceIcon;
 
-// QR Code Scanner variables
+  // QR Code Scanner variables
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   Barcode? result;
   QRViewController? controller;
@@ -79,18 +79,6 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
         // Access Firestore
         FirebaseFirestore firestore = FirebaseFirestore.instance;
-
-/*
-// Access QR code data (if available)
-        if (result != null) {
-          String? scannedData = result!.code;
-          // Use the scannedData to update applianceData
-          // For example:
-          applianceData['deviceNumber'] = scannedData;
-          // Or any other processing based on the scanned data
-        }
-
-*/
 
         // Input Validation
         if (_selectedApplianceIcon == null) {
@@ -161,11 +149,11 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           'name': _applianceNameController.text,
           'maxUsageLimit': int.tryParse(_maxUsageLimitController.text) ??
               0, // Use int.tryParse for whole numbers
-
           'unit': _selectedTimeUnit,
           'isOn': false, // Initially, the appliance is off
           'isRunning': false, // Initially, the appliance is not running
           'deviceNumber': 'Device $_deviceCount', // Add device number to data
+          'applianceType': _getSelectedApplianceType(), // Add appliance type
         };
 
         try {
@@ -244,6 +232,20 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         print('Error fetching device count: $e');
         // Handle the error appropriately, e.g., show an error message
       }
+    }
+  }
+
+  String _getSelectedApplianceType() {
+    if (_selectedApplianceIcon == Icons.lightbulb_outline) {
+      return 'lightbulb';
+    } else if (_selectedApplianceIcon == Icons.air) {
+      return 'fan';
+    } else if (_selectedApplianceIcon == Icons.tv) {
+      return 'tv';
+    } else if (_selectedApplianceIcon == Icons.kitchen) {
+      return 'refrigerator';
+    } else {
+      return 'unknown'; // Default or handle other cases
     }
   }
 

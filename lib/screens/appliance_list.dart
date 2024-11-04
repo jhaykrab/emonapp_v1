@@ -24,11 +24,26 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
   UserData? _userData;
   bool _isApplianceOn = false; // Track the global appliance state
 
+  // Define a map of icon constants
+  static const Map<String, IconData> applianceIcons = {
+    'lightbulb': Icons.lightbulb_outline,
+    'fan': Icons.air,
+    'tv': Icons.tv,
+    'refrigerator': Icons.kitchen,
+    // Add more appliance types and icons as needed
+  };
+
   // Variables to store runtime values from Realtime Database
   int _runtimeHours = 0;
   int _runtimeMinutes = 0;
   int _runtimeSeconds = 0;
   final DatabaseService _dbService = DatabaseService();
+
+  // Define IconData constants for dropdown
+  static const IconData iconLightbulb = Icons.lightbulb_outline;
+  static const IconData iconFan = Icons.air;
+  static const IconData iconTv = Icons.tv;
+  static const IconData iconRefrigerator = Icons.kitchen;
 
   // Realtime Database reference (same path as in DashboardScreen)
   final DatabaseReference _databaseRef =
@@ -244,7 +259,6 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     );
   }
 
-  // Function to edit an existing appliance (updated)
   Future<void> _editAppliance(int index) async {
     final appliance = _appliances[index];
     final applianceDocId = appliance['docId'];
@@ -252,12 +266,12 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     // Set initial values for the controllers and selected icon
     _applianceNameController.text = appliance['name'];
     _selectedApplianceIcon =
-        IconData(appliance['icon'], fontFamily: 'MaterialIcons');
-
+        applianceIcons[appliance['applianceType']] ?? Icons.device_unknown;
     // Show a dialog to edit appliance name, icon, and device number
     await showDialog(
       context: context,
       builder: (BuildContext context) {
+        const int maxNameLength = 15; // Set the maximum name length to display
         return AlertDialog(
           title: const Text('Edit Appliance'),
           content: SingleChildScrollView(
@@ -272,7 +286,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   keyboardType: TextInputType.number, // Allow only numbers
                   onChanged: (value) {
                     // You can add validation here if needed
-                    appliance['deviceNumber'] = '$value';
+                    appliance['deviceNumber'] = int.tryParse(value) ?? 0;
                   },
                 ),
                 const SizedBox(height: 16),
@@ -292,20 +306,20 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   },
                   items: const [
                     DropdownMenuItem(
-                      value: Icons.lightbulb_outline,
-                      child: Icon(Icons.lightbulb_outline),
+                      value: iconLightbulb, // Use constant
+                      child: Icon(iconLightbulb),
                     ),
                     DropdownMenuItem(
-                      value: Icons.air,
-                      child: Icon(Icons.air),
+                      value: iconFan, // Use constant
+                      child: Icon(iconFan),
                     ),
                     DropdownMenuItem(
-                      value: Icons.tv,
-                      child: Icon(Icons.tv),
+                      value: iconTv, // Use constant
+                      child: Icon(iconTv),
                     ),
                     DropdownMenuItem(
-                      value: Icons.kitchen,
-                      child: Icon(Icons.kitchen),
+                      value: iconRefrigerator, // Use constant
+                      child: Icon(iconRefrigerator),
                     ),
                     // Add more icons as needed
                   ],
@@ -523,6 +537,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const int maxNameLength = 15;
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
       body: Container(
@@ -562,10 +577,10 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                             // Changed from Column to Row
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              // Appliance Icon
+                              // Appliance Icon (corrected)
                               Icon(
-                                IconData(appliance['icon'] ?? 0,
-                                    fontFamily: 'MaterialIcons'),
+                                applianceIcons[appliance['applianceType']] ??
+                                    Icons.device_unknown,
                                 size: 40,
                                 color: const Color.fromARGB(255, 72, 100, 68),
                               ),
@@ -581,11 +596,22 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    appliance['name'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
+                                  // Truncated appliance name with hover effect
+                                  MouseRegion(
+                                    onEnter: (_) => setState(() {}),
+                                    onExit: (_) => setState(() {}),
+                                    child: Tooltip(
+                                      message: appliance['name'],
+                                      preferBelow: false,
+                                      child: Text(
+                                        appliance['name'].length > maxNameLength
+                                            ? '${appliance['name'].substring(0, maxNameLength)}...'
+                                            : appliance['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   Text(
