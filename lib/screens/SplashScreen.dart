@@ -30,22 +30,6 @@ class SplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
-              // Sign In as Admin Button with Shadow
-              _buildElevatedButton(
-                'Signin as Admin',
-                () {
-                  // TODO: Navigate to Admin Login Screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreenAdmin()),
-                  );
-                },
-                buttonColor:
-                    Color.fromARGB(255, 72, 100, 68), // Dark green color
-              ),
-              const SizedBox(height: 25),
-
               // Sign In Button with Shadow
               _buildElevatedButton(
                 'Signin as User',
@@ -74,6 +58,32 @@ class SplashScreen extends StatelessWidget {
                 isOutlined: true, // Make this button outlined
                 buttonColor: Colors.white, // Set button color to white
               ),
+              const SizedBox(height: 25),
+
+              // "Or" Text
+              const Text(
+                "or",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color.fromARGB(255, 72, 100, 68),
+                ),
+              ),
+              const SizedBox(height: 25),
+
+              // Sign In as Admin Button with Shadow
+              _buildElevatedButton(
+                'Signin as Admin',
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreenAdmin()),
+                  );
+                },
+                buttonColor:
+                    Color.fromARGB(255, 72, 100, 68), // Dark green color
+              ),
+              const SizedBox(height: 25),
             ],
           ),
         ),

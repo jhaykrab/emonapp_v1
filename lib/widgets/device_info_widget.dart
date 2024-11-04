@@ -64,6 +64,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
       duration: Duration(milliseconds: 200), // Adjust shake duration
     );
     _fetchRealtimeData(); // Fetch initial data
+    _listenToApplianceState();
     _listenToRealtimeData(); // Listen for updates
   }
 
@@ -325,6 +326,16 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
       print('Error fetching Realtime Database data: $e');
       // Handle errors, e.g., show an error message
     }
+  }
+
+  void _listenToApplianceState() {
+    databaseRef.child('SensorReadings/applianceState').onValue.listen((event) {
+      bool newApplianceState = event.snapshot.value as bool? ?? false;
+
+      // Update the global state
+      Provider.of<GlobalState>(context, listen: false).isApplianceOn =
+          newApplianceState;
+    });
   }
 
   // Function to listen for Realtime Database updates

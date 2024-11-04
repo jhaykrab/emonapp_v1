@@ -10,8 +10,10 @@ import 'package:Emon/widgets/app_bar_widget.dart';
 import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
 import 'package:Emon/screens/history_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
+  static const String routeName = '/dashboard';
   const DashboardScreen({super.key});
 
   @override
@@ -39,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _runtimesec = 0;
   bool _isApplianceOn = false;
   UserData? _userData;
+  StreamSubscription<DatabaseEvent>? _realtimeSubscription;
 
   @override
   void initState() {
@@ -47,6 +50,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _fetchUserData();
     _listenToSensorReadings();
     _fetchApplianceData();
+  }
+
+  // In dashboard_screen.dart
+  @override
+  void dispose() {
+    _realtimeSubscription?.cancel(); // Cancel the Realtime Database listener
+    super.dispose();
   }
 
   // Function to fetch user data (firstName, lastName) from Firestore

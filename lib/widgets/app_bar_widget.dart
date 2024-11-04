@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:Emon/screens/SplashScreen.dart'; // Import your DashboardScreen
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:Emon/screens/dashboard_screen.dart ';
 
 class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   final String userName;
@@ -9,7 +11,7 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return PreferredSize(
-      preferredSize: Size.fromHeight(60.0), // Set the desired height here
+      preferredSize: Size.fromHeight(60.0),
       child: AppBar(
         backgroundColor: const Color.fromARGB(255, 72, 100, 68),
         elevation: 3,
@@ -32,20 +34,10 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
             ),
             Spacer(),
             // Logout Button
-            TextButton(
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.pushReplacementNamed(context, '/LoginScreen');
-              },
-              child: Text(
-                "Logout",
-                style: TextStyle(
-                  color: Color(0xFFe8f5e9),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Color(0xFFe8f5e9)),
+              onPressed: () => _signOut(context), // Pass context here
             ),
-
             IconButton(
               icon: Icon(Icons.settings),
               color: Color(0xFFe8f5e9),
@@ -61,5 +53,12 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => Size.fromHeight(60.0); // Also set the height here
+  Size get preferredSize => Size.fromHeight(60.0);
+
+  // Function to sign out the admin (now accepts context)
+  Future<void> _signOut(BuildContext context) async {
+    await FirebaseAuth.instance.signOut(); // Sign out using FirebaseAuth
+    // Navigate to SplashScreen after sign-out
+    Navigator.pushReplacementNamed(context, SplashScreen.routeName);
+  }
 }
