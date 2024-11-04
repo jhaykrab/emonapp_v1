@@ -45,6 +45,7 @@ class AppBarWidget extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
+
             IconButton(
               icon: Icon(Icons.settings),
               color: Color(0xFFe8f5e9),

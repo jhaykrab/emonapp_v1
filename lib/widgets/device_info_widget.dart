@@ -1,9 +1,11 @@
 import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:math' as math; // Import math library for animation
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:Emon/services/global_state.dart';
+import 'package:provider/provider.dart';
 
 // Define an Appliance class to hold data for each appliance
 class Appliance {
@@ -17,8 +19,8 @@ class Appliance {
   final int runtimemin;
   final int runtimesec;
   final bool isApplianceOn;
-  final ValueChanged<bool> onToggleChanged;
   final String documentId; // Add documentId
+  final ValueChanged<bool> onToggleChanged;
 
   Appliance({
     required this.name, // Initialize name
@@ -31,8 +33,8 @@ class Appliance {
     required this.runtimemin,
     required this.runtimesec,
     required this.isApplianceOn,
-    required this.onToggleChanged,
     required this.documentId,
+    required this.onToggleChanged,
   });
 }
 
@@ -52,6 +54,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
     with SingleTickerProviderStateMixin {
   bool _showDeleteIcon = false; // Flag to control delete icon visibility
   late AnimationController _animationController; // Animation controller
+  final databaseRef = FirebaseDatabase.instance.ref();
 
   @override
   void initState() {
@@ -60,6 +63,8 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
       vsync: this,
       duration: Duration(milliseconds: 200), // Adjust shake duration
     );
+    _fetchRealtimeData(); // Fetch initial data
+    _listenToRealtimeData(); // Listen for updates
   }
 
   @override
@@ -147,111 +152,190 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
   Widget _buildApplianceRow(Appliance appliance) {
     const int maxNameLength = 10; // Set the maximum name length to display
 
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-      decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 223, 236, 219),
-        borderRadius: BorderRadius.circular(8.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            appliance.icon,
-            size: 36,
-            color: const Color.fromARGB(255, 72, 100, 68),
-          ),
-          SizedBox(width: 16),
-          // Truncated appliance name with hover effect
-          MouseRegion(
-            onEnter: (_) => setState(() {}), // No state change on hover
-            onExit: (_) => setState(() {}), // No state change on exit
-            child: Tooltip(
-              message: appliance.name, // Full name in tooltip
-              preferBelow: false, // Tooltip will be above if it overlaps
-              child: Text(
-                appliance.name.length > maxNameLength
-                    ? '${appliance.name.substring(0, maxNameLength)}...'
-                    : appliance.name,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 40),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Energy: ${appliance.energy.toStringAsFixed(2)} kWh',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-              Text(
-                'Voltage: ${appliance.voltage.toStringAsFixed(1)} V',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-              Text(
-                'Current: ${appliance.current.toStringAsFixed(2)} A',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-              Text(
-                'Power: ${appliance.power.toStringAsFixed(1)} W',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-              Text(
-                'Runtime: ${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
+    return Consumer<GlobalState>(
+      builder: (context, globalState, child) {
+        return Container(
+          padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+          margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 223, 236, 219),
+            borderRadius: BorderRadius.circular(8.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-
-          Spacer(),
-          Transform.scale(
-            scale: 0.8,
-            child: Switch(
-              value: appliance.isApplianceOn,
-              onChanged: appliance.onToggleChanged,
-              activeTrackColor: Colors.green[700],
-              activeColor: Colors.green[900],
-              inactiveTrackColor: Colors.grey[400],
-              inactiveThumbColor: Colors.grey[300],
-            ),
+          child: Row(
+            children: [
+              Icon(
+                appliance.icon,
+                size: 36,
+                color: const Color.fromARGB(255, 72, 100, 68),
+              ),
+              SizedBox(width: 8),
+              // Truncated appliance name with hover effect
+              MouseRegion(
+                onEnter: (_) => setState(() {}), // No state change on hover
+                onExit: (_) => setState(() {}), // No state change on exit
+                child: Tooltip(
+                  message: appliance.name, // Full name in tooltip
+                  preferBelow: false, // Tooltip will be above if it overlaps
+                  child: Text(
+                    appliance.name.length > maxNameLength
+                        ? '${appliance.name.substring(0, maxNameLength)}...'
+                        : appliance.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 40),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Energy: ${appliance.energy.toStringAsFixed(2)} kWh',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                  Text(
+                    'Voltage: ${appliance.voltage.toStringAsFixed(1)} V',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                  Text(
+                    'Current: ${appliance.current.toStringAsFixed(2)} A',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                  Text(
+                    'Power: ${appliance.power.toStringAsFixed(1)} W',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                  Text(
+                    'Runtime: ${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                ],
+              ),
+              Spacer(),
+              Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                  value: globalState.isApplianceOn,
+                  onChanged: (value) {
+                    globalState.isApplianceOn = value;
+                    _toggleAppliance(appliance.documentId, value);
+                  },
+                  activeTrackColor: Colors.green[700],
+                  activeColor: Colors.green[900],
+                  inactiveTrackColor: Colors.grey[400],
+                  inactiveThumbColor: Colors.grey[300],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: () {
+                  _showDeleteConfirmationDialog(appliance.documentId);
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.delete, color: Colors.red),
-            onPressed: () {
-              _showDeleteConfirmationDialog(appliance.documentId);
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  // Function to toggle appliance state in Firestore and Realtime Database
+  Future<void> _toggleAppliance(String documentId, bool newValue) async {
+    try {
+      // Get the current user's UID
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('User not logged in!');
+        return;
+      }
+
+      // Update the 'isOn' field in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('registered_appliances')
+          .doc(documentId)
+          .update({'isOn': newValue});
+
+      // Update the appliance state in Realtime Database
+      await databaseRef.child('SensorReadings/applianceState').set(newValue);
+
+      print('Appliance state updated successfully!');
+    } catch (e) {
+      print('Error updating appliance state: $e');
+      // Handle errors, e.g., show an error message
+    }
+  }
+
+  // Function to fetch Realtime Database readings
+  Future<void> _fetchRealtimeData() async {
+    try {
+      DatabaseEvent event = await databaseRef.child('SensorReadings').once();
+      DataSnapshot snapshot = event.snapshot;
+      if (snapshot.value != null) {
+        Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+
+        setState(() {
+          // Update the Appliance objects in the list
+          for (var i = 0; i < widget.appliances.length; i++) {
+            widget.appliances[i] = Appliance(
+              name: widget.appliances[i].name,
+              icon: widget.appliances[i].icon,
+              energy: data['energy']?.toDouble() ?? 0.0,
+              voltage: data['voltage']?.toDouble() ?? 0.0,
+              current: data['current']?.toDouble() ?? 0.0,
+              power: data['power']?.toDouble() ?? 0.0,
+              runtimehr: data['runtimehr']?.toInt() ?? 0,
+              runtimemin: data['runtimemin']?.toInt() ?? 0,
+              runtimesec: data['runtimesec']?.toInt() ?? 0,
+              isApplianceOn: data['applianceState'] ?? false,
+              documentId: widget.appliances[i].documentId,
+              onToggleChanged: widget.appliances[i].onToggleChanged,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching Realtime Database data: $e');
+      // Handle errors, e.g., show an error message
+    }
+  }
+
+  // Function to listen for Realtime Database updates
+  void _listenToRealtimeData() {
+    databaseRef.child('SensorReadings').onValue.listen((event) {
+      if (event.snapshot.value != null) {
+        Map<dynamic, dynamic> data =
+            event.snapshot.value as Map<dynamic, dynamic>;
+        _fetchRealtimeData(); // Update the appliance data
+      }
+    });
   }
 
   // Helper function to build reading titles

@@ -7,6 +7,8 @@ import 'package:Emon/services/database.dart';
 import 'package:Emon/models/user_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Emon/screens/setup_appliance_screen.dart';
+import 'package:Emon/services/global_state.dart';
+import 'package:provider/provider.dart';
 
 class ApplianceListScreen extends StatefulWidget {
   const ApplianceListScreen({super.key});
@@ -270,7 +272,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   keyboardType: TextInputType.number, // Allow only numbers
                   onChanged: (value) {
                     // You can add validation here if needed
-                    appliance['deviceNumber'] = 'Device $value';
+                    appliance['deviceNumber'] = '$value';
                   },
                 ),
                 const SizedBox(height: 16),
@@ -626,13 +628,17 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                                 children: [
                                   // Toggle Switch
                                   Switch(
-                                    value: _isApplianceOn,
+                                    value: Provider.of<GlobalState>(context)
+                                        .isApplianceOn,
                                     onChanged: (value) {
-                                      setState(() {
-                                        _isApplianceOn = value;
-                                        _databaseRef.update(
-                                            {'applianceState': _isApplianceOn});
-                                      });
+                                      // Update global state
+                                      Provider.of<GlobalState>(context,
+                                              listen: false)
+                                          .isApplianceOn = value;
+
+                                      // Update Realtime Database
+                                      _databaseRef
+                                          .update({'applianceState': value});
                                     },
                                     activeTrackColor: Colors.green[700],
                                     activeColor: Colors.green[900],
