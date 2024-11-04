@@ -96,7 +96,6 @@ class _AdminPageState extends State<AdminPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // Container to display fetched serial numbers
               if (_showSerialNumbers)
                 Container(
@@ -110,26 +109,54 @@ class _AdminPageState extends State<AdminPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Fetched Serial Number:', // Changed to singular
+                        'Device Serial List:',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Text(
-                        _fetchedSerialNumber, // Display the fetched serial number
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                      // Display serial numbers with device names
+                      for (int i = 0; i < _serialNumbers.length; i++)
+                        Text(
+                          'Device_${i + 1}: ${_serialNumbers[i]}', // Format: Device_01: <serialNumber>
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      const SizedBox(height: 10),
+                      // Display the fetched serial number (if needed)
+                      if (_fetchedSerialNumber.isNotEmpty)
+                        RichText(
+                          text: TextSpan(
+                            text: 'Device_01: ',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(
+                                  255, 20, 20, 20), // Black for "Device_01"
+                            ),
+                            children: <TextSpan>[
+                              TextSpan(
+                                text: _fetchedSerialNumber,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromARGB(255, 72, 100,
+                                      68), // Dark green for serial number
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
 
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _isMigrating || _serialNumbers.isEmpty
+                onPressed: _fetchedSerialNumber.isEmpty
                     ? null
-                    : _migrateToFirestore,
+                    : _migrateToFirestore, // Temporarily remove _isMigrating
+
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                   padding:
@@ -166,6 +193,7 @@ class _AdminPageState extends State<AdminPage> {
 
     // Fetch the serial number from Realtime Database
     _fetchedSerialNumber = await fetchSerialNumber();
+    _serialNumbers = await fetchSerialNumbersFromRTDB();
 
     setState(() {
       _isMigrating = false;
@@ -176,7 +204,13 @@ class _AdminPageState extends State<AdminPage> {
     setState(() {
       _isMigrating = true; // Set migrating flag to true
     });
+
+    // Migrate the fetched serial number to Firestore
+    await migrateSerialNumberToFirestore(_fetchedSerialNumber);
+
+    // Migrate other serial numbers from the list
     await migrateSerialNumbersToFirestore(_serialNumbers);
+
     setState(() {
       _isMigrating = false; // Set migrating flag to false
     });
@@ -200,22 +234,48 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
+  // Function to migrate a single serial number to Firestore
+  Future<void> migrateSerialNumberToFirestore(String serialNumber) async {
+    final firestore = FirebaseFirestore.instance;
+    try {
+      // Create a new document in Firestore under 'admin/emon-devices'
+      await firestore.collection('admin').doc('emon-devices').set(
+          {
+            'Device_01':
+                serialNumber, // Add the serial number with the device name
+          },
+          SetOptions(
+              merge: true)); // Use merge to avoid overwriting existing data
+
+      print('Migrated serial number: $serialNumber to Firestore');
+    } catch (e) {
+      print('Error migrating serial number $serialNumber to Firestore: $e');
+      _showErrorDialog("Error",
+          "Failed to migrate serial number $serialNumber to Firestore.");
+    }
+  }
+
   // Function to migrate serial numbers to Firestore
   Future<void> migrateSerialNumbersToFirestore(
       List<String> serialNumbers) async {
     final firestore = FirebaseFirestore.instance;
-    for (String serialNumber in serialNumbers) {
+    for (int i = 0; i < serialNumbers.length; i++) {
       try {
-        // Create a new document in Firestore with the serial number as the document ID
-        await firestore.collection('devices').doc(serialNumber).set({
-          'serialNumber': serialNumber,
-          // Add other device data if needed
-        });
-        print('Migrated serial number: $serialNumber');
+        // Create a new document in Firestore under 'admin/emon-devices'
+        await firestore.collection('admin').doc('emon-devices').set(
+            {
+              'Device_${i + 1}': serialNumbers[
+                  i], // Add each serial number with its device name
+            },
+            SetOptions(
+                merge: true)); // Use merge to avoid overwriting existing data
+
+        print('Migrated serial number: ${serialNumbers[i]} to Firestore');
       } catch (e) {
-        print('Error migrating serial number $serialNumber: $e');
-        _showErrorDialog(
-            "Error", "Failed to migrate serial number $serialNumber.");
+        print(
+            'Error migrating serial number ${serialNumbers[i]} to Firestore: $e');
+        _showErrorDialog("Error",
+            "Failed to migrate serial number ${serialNumbers[i]} to Firestore.");
       }
     }
     _showSuccessDialog("Success", "Serial numbers migrated to Firestore.");
@@ -260,5 +320,24 @@ class _AdminPageState extends State<AdminPage> {
     await FirebaseAuth.instance.signOut(); // Sign out using FirebaseAuth
     // Navigate to SplashScreen after sign-out
     Navigator.pushReplacementNamed(context, SplashScreen.routeName);
+  }
+
+  // Function to fetch serial numbers from Realtime Database
+  Future<List<String>> fetchSerialNumbersFromRTDB() async {
+    List<String> serialNumbers = [];
+    try {
+      DatabaseEvent snapshot = await databaseRef.child('Serial_Numbers').once();
+      if (snapshot.snapshot.value != null) {
+        Map<dynamic, dynamic> data =
+            snapshot.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          serialNumbers.add(value.toString());
+        });
+      }
+    } catch (e) {
+      print('Error fetching serial numbers: $e');
+      _showErrorDialog("Error", "Failed to fetch serial numbers.");
+    }
+    return serialNumbers;
   }
 }
