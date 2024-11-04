@@ -192,8 +192,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               // Title: Consumption
               Container(
                 padding: EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 16.0), // Adjust padding if needed
+                    vertical: 6.0,
+                    horizontal: 14.0), // Adjust padding if needed
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: const Color.fromARGB(255, 96, 167, 87),
@@ -222,7 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ? "Weekly Consumption"
                                   : "Monthly Consumption",
                       style: TextStyle(
-                        fontSize: 16.0,
+                        fontSize: 14.0,
                         fontWeight: FontWeight.bold,
                         color: const Color.fromARGB(255, 96, 167, 87),
                       ),
