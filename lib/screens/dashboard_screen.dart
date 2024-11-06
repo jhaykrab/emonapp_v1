@@ -249,29 +249,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     index: 0,
                     selectedTabIndex: _selectedTabIndex,
                     onPressed: () => _onTimeButtonTapped(0),
+                    buttonWidth: 60, // Reduced button width
+                    fontSize: 10, // Reduced font size
                   ),
-                  SizedBox(width: 16),
+                  SizedBox(width: 8), // Reduced spacing
                   TimeButtonWidget(
                     label: 'Daily',
                     index: 1,
                     selectedTabIndex: _selectedTabIndex,
                     onPressed: () => _onTimeButtonTapped(1),
+                    buttonWidth: 60, // Reduced button width
+                    fontSize: 10, // Reduced font size
                   ),
-                  SizedBox(width: 16),
+                  SizedBox(width: 8), // Reduced spacing
                   TimeButtonWidget(
                     label: 'Weekly',
                     index: 2,
                     selectedTabIndex: _selectedTabIndex,
                     onPressed: () => _onTimeButtonTapped(2),
+                    buttonWidth: 60, // Reduced button width
+                    fontSize: 10, // Reduced font size
                   ),
-                  SizedBox(width: 16),
+                  SizedBox(width: 8), // Reduced spacing
                   TimeButtonWidget(
                     label: 'Monthly',
                     index: 3,
                     selectedTabIndex: _selectedTabIndex,
                     onPressed: () => _onTimeButtonTapped(3),
+                    buttonWidth: 60, // Reduced button width
+                    fontSize: 10, // Reduced font size
                   ),
-                  SizedBox(width: 16),
+                  SizedBox(width: 8), // Reduced spacing
                 ],
               ),
 
@@ -291,7 +299,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                   minimumSize: Size(180, 40),
-                  padding: EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(5),
                   ),

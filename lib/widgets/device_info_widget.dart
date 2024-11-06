@@ -55,6 +55,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
   bool _showDeleteIcon = false; // Flag to control delete icon visibility
   late AnimationController _animationController; // Animation controller
   final databaseRef = FirebaseDatabase.instance.ref();
+  Timestamp? _serverTimestamp;
 
   @override
   void initState() {
@@ -66,6 +67,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
     _fetchRealtimeData(); // Fetch initial data
     _listenToApplianceState();
     _listenToRealtimeData(); // Listen for updates
+    _fetchServerTimestamp(); // Fetch the server timestamp
   }
 
   @override
@@ -78,7 +80,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 450,
+        width: 380, // Adjusted width
         padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 0.0),
         margin: EdgeInsets.only(top: 40.0),
         decoration: BoxDecoration(
@@ -100,10 +102,13 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Date and Day of the Week
+            // Date and Day of the Week (Modified)
             Center(
               child: Text(
-                DateFormat('MMMM d, yyyy - EEEE').format(DateTime.now()),
+                _serverTimestamp != null
+                    ? DateFormat('MMMM d, yyyy - EEEE')
+                        .format(_serverTimestamp!.toDate())
+                    : 'Loading date...', // Display while fetching
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -149,15 +154,28 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
     );
   }
 
+  // Function to fetch the server timestamp from Firestore
+  Future<void> _fetchServerTimestamp() async {
+    try {
+      // Get the server timestamp
+      _serverTimestamp = Timestamp.now();
+
+      setState(() {}); // Update the UI
+    } catch (e) {
+      print('Error fetching server timestamp: $e');
+      // Handle errors, e.g., show an error message
+    }
+  }
+
   // Helper function to build a row for each appliance
   Widget _buildApplianceRow(Appliance appliance) {
-    const int maxNameLength = 10; // Set the maximum name length to display
+    const int maxNameLength = 8; // Set the maximum name length to display
 
     return Consumer<GlobalState>(
       builder: (context, globalState, child) {
         return Container(
-          padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+          padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
+          margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 10.0),
           decoration: BoxDecoration(
             color: const Color.fromARGB(255, 223, 236, 219),
             borderRadius: BorderRadius.circular(8.0),
@@ -174,7 +192,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
             children: [
               Icon(
                 appliance.icon,
-                size: 36,
+                size: 30,
                 color: const Color.fromARGB(255, 72, 100, 68),
               ),
               SizedBox(width: 8),
@@ -190,57 +208,36 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                         ? '${appliance.name.substring(0, maxNameLength)}...'
                         : appliance.name,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: const Color.fromARGB(255, 72, 100, 68),
                     ),
                   ),
                 ),
               ),
-              SizedBox(width: 40),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Energy: ${appliance.energy.toStringAsFixed(2)} kWh',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                  ),
-                  Text(
-                    'Voltage: ${appliance.voltage.toStringAsFixed(1)} V',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                  ),
-                  Text(
-                    'Current: ${appliance.current.toStringAsFixed(2)} A',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                  ),
-                  Text(
-                    'Power: ${appliance.power.toStringAsFixed(1)} W',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                  ),
-                  Text(
-                    'Runtime: ${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                  ),
-                ],
+              SizedBox(width: 10),
+              // Column for readings (adjust width as needed)
+              SizedBox(
+                width: 130, // Adjust width to fit content
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildReadingRow('Energy:',
+                        '${appliance.energy.toStringAsFixed(2)} kWh'),
+                    _buildReadingRow('Voltage:',
+                        '${appliance.voltage.toStringAsFixed(1)} V'), // Added back Voltage
+                    _buildReadingRow('Current:',
+                        '${appliance.current.toStringAsFixed(2)} A'), // Added back Current
+                    _buildReadingRow(
+                        'Power:', '${appliance.power.toStringAsFixed(1)} W'),
+                    _buildReadingRow('Runtime:',
+                        '${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}'),
+                  ],
+                ),
               ),
               Spacer(),
               Transform.scale(
-                scale: 0.8,
+                scale: 0.7,
                 child: Switch(
                   value: globalState.isApplianceOn,
                   onChanged: (value) {
@@ -255,6 +252,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
               ),
               IconButton(
                 icon: Icon(Icons.delete, color: Colors.red),
+                iconSize: 24,
                 onPressed: () {
                   _showDeleteConfirmationDialog(appliance.documentId);
                 },
@@ -349,38 +347,26 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
     });
   }
 
-  // Helper function to build reading titles
-  Widget _buildReadingTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
-        color: const Color.fromARGB(255, 72, 100, 68),
-      ),
-    );
-  }
-
-  // Helper function to build reading values
-  Widget _buildReadingValue(String value) {
-    return Text(
-      value,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: const Color.fromARGB(255, 72, 100, 68),
-      ),
-    );
-  }
-
-  // Helper function to build unit labels
-  Widget _buildUnit(String unit) {
-    return Text(
-      unit,
-      style: TextStyle(
-        fontSize: 10,
-        color: const Color.fromARGB(255, 72, 100, 68),
-      ),
+  // Helper function to build a row for each reading
+  Widget _buildReadingRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          '$label ',
+          style: TextStyle(
+            fontSize: 12, // Reduced font size
+            color: const Color.fromARGB(255, 72, 100, 68),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12, // Reduced font size
+            fontWeight: FontWeight.bold,
+            color: const Color.fromARGB(255, 72, 100, 68),
+          ),
+        ),
+      ],
     );
   }
 

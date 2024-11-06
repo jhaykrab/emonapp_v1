@@ -25,8 +25,8 @@ class SplashScreen extends StatelessWidget {
             children: [
               Image.asset(
                 'assets/images/logo_light.png',
-                height: 280.0,
-                width: 280.0,
+                height: 250.0, // Reduced logo height
+                width: 250.0, // Reduced logo width
               ),
               const SizedBox(height: 10),
 
@@ -43,7 +43,7 @@ class SplashScreen extends StatelessWidget {
                 buttonColor:
                     Color.fromARGB(255, 72, 100, 68), // Dark green color
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 15), // Reduced spacing
 
               // Sign Up Button with Shadow
               _buildElevatedButton(
@@ -58,17 +58,17 @@ class SplashScreen extends StatelessWidget {
                 isOutlined: true, // Make this button outlined
                 buttonColor: Colors.white, // Set button color to white
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 15), // Reduced spacing
 
               // "Or" Text
               const Text(
                 "or",
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14, // Reduced font size
                   color: Color.fromARGB(255, 72, 100, 68),
                 ),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 15), // Reduced spacing
 
               // Sign In as Admin Button with Shadow
               _buildElevatedButton(
@@ -83,7 +83,7 @@ class SplashScreen extends StatelessWidget {
                 buttonColor:
                     Color.fromARGB(255, 72, 100, 68), // Dark green color
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 15), // Reduced spacing
             ],
           ),
         ),
@@ -95,7 +95,7 @@ class SplashScreen extends StatelessWidget {
   Widget _buildElevatedButton(String label, VoidCallback onPressed,
       {bool isOutlined = false, Color buttonColor = Colors.transparent}) {
     return Container(
-      width: 275, // Set a fixed width for all buttons
+      width: 250, // Reduced button width
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
@@ -110,9 +110,9 @@ class SplashScreen extends StatelessWidget {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: buttonColor, // Use the provided button color
-          padding: const EdgeInsets.symmetric(vertical: 17),
+          padding: const EdgeInsets.symmetric(vertical: 14), // Reduced padding
           textStyle: const TextStyle(
-            fontSize: 15,
+            fontSize: 13, // Reduced font size
             fontWeight: FontWeight.w600,
             fontFamily: 'Poppins',
             letterSpacing: 1.0, // Add letter spacing here

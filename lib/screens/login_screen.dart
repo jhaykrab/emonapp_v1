@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     text: 'Welcome back ',
                     style: const TextStyle(
                       color: Color.fromARGB(255, 54, 83, 56),
-                      fontSize: 16.0,
+                      fontSize: 14.0, // Reduced font size
                       fontWeight: FontWeight.bold,
                     ),
                     children: <TextSpan>[
@@ -84,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         text: ' $_firstName!',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18.0,
+                          fontSize: 16.0, // Reduced font size
                           color: Color.fromARGB(255, 54, 83, 56),
                         ),
                       ),

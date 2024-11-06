@@ -5,6 +5,8 @@ class TimeButtonWidget extends StatelessWidget {
   final int index;
   final int selectedTabIndex;
   final VoidCallback onPressed;
+  final double buttonWidth; // Add buttonWidth parameter
+  final double fontSize; // Add fontSize parameter
 
   const TimeButtonWidget({
     Key? key,
@@ -12,33 +14,37 @@ class TimeButtonWidget extends StatelessWidget {
     required this.index,
     required this.selectedTabIndex,
     required this.onPressed,
+    this.buttonWidth = 80.0, // Default button width
+    this.fontSize = 12.0, // Default font size
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = selectedTabIndex == index;
-
-    return OutlinedButton(
+    return ElevatedButton(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: isSelected
-            ? const Color.fromARGB(255, 72, 100, 68)
-            : Colors.transparent,
-        side: BorderSide(
-          color: const Color.fromARGB(255, 72, 100, 68),
-          width: 2.0,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: index == selectedTabIndex
+            ? const Color.fromARGB(255, 54, 83, 56)
+            : const Color.fromARGB(255, 243, 250, 244),
+        minimumSize: Size(buttonWidth, 30),
+        padding: EdgeInsets.symmetric(
+            horizontal: 18, vertical: 12), // Increased padding
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(3.0),
+          side: BorderSide(
+            color: const Color.fromARGB(255, 54, 83, 56),
+            width: 1.5,
+          ),
         ),
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: fontSize,
           fontWeight: FontWeight.normal,
-          color: isSelected
+          color: index == selectedTabIndex
               ? Colors.white
-              : const Color.fromARGB(255, 72, 100, 68),
+              : const Color.fromARGB(255, 54, 83, 56), // Dark green text
         ),
       ),
     );
