@@ -280,7 +280,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
           .doc(user.uid)
           .collection('registered_appliances')
           .doc(documentId)
-          .update({'isOn': newValue});
+          .update({'isOn': newValue}); 
 
       // Update the appliance state in Realtime Database
       await databaseRef.child('SensorReadings/applianceState').set(newValue);
