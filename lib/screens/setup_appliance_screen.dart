@@ -284,7 +284,14 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                       fontFamily: 'Rubik',
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 50),
+
+                  Image.asset(
+                    'assets/staticimgs/tech-support-concept-illustration.png',
+                    height: 200.0,
+                    width: 200.0,
+                  ),
+                  const SizedBox(height: 50),
 
                   // Device Serial Number Input
                   Padding(
