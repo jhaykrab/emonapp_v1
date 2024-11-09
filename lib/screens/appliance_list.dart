@@ -485,6 +485,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
               onPressed: () async {
                 final appliance = _appliances[index];
                 final applianceDocId = appliance['docId'];
+                final applianceSerialNumber = appliance['deviceSerialNumber'];
 
                 try {
                   // Remove appliance data from Firestore
@@ -495,11 +496,33 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                       .doc(applianceDocId)
                       .delete();
 
+                  // --- Remove UID from Realtime Database ---
+                  final DatabaseReference dbRef = FirebaseDatabase.instance
+                      .ref(); // Declare dbRef only once
+                  List<String> paths = [
+                    'SensorReadings',
+                    'SensorReadings_2',
+                    'SensorReadings_3',
+                  ];
+
+                  for (String path in paths) {
+                    final DataSnapshot snapshot =
+                        await dbRef.child('$path/serialNumber').get();
+
+                    if (snapshot.value != null &&
+                        snapshot.value.toString() == applianceSerialNumber) {
+                      // Found matching serial number, remove UID field
+                      await dbRef.child('$path/uid').remove();
+                      print(
+                          'UID field removed from Realtime Database path: $path');
+                      break; // Stop searching after finding a match
+                    }
+                  }
+
                   // Update the _appliances list
                   setState(() {
                     _appliances.removeAt(index);
                   });
-
                   // Show success message
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

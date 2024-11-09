@@ -37,10 +37,18 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   final FocusNode _maxUsageLimitFocusNode = FocusNode();
   final FocusNode _deviceSerialNumberFocusNode = FocusNode();
 
+  int _nextDbPathIndex = 0;
+  List<String> _dbPaths = [
+    'SensorReadings',
+    'SensorReadings_2',
+    'SensorReadings_3',
+  ];
+
   @override
   void initState() {
     super.initState();
     _fetchDeviceCount();
+    _fetchNextDbPathIndex();
   }
 
   Future<void> _searchSerialNumber() async {
@@ -49,31 +57,30 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     if (serialNumber.isEmpty) return;
 
     final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
-    Set<String> foundSerialNumbers = {};
-    List<String> paths = [
-      'SensorReadings/serialNumber',
-      'SensorReadings_2/serialNumber',
-      'SensorReadings_3/serialNumber',
-    ];
-
+    bool isDeviceInUse = false;
     try {
-      for (String path in paths) {
+      for (String path in _dbPaths) {
         final DataSnapshot snapshot = await dbRef.child(path).get();
 
-        // Directly compare the snapshot value to the serialNumber
-        if (snapshot.value != null &&
-            snapshot.value.toString() == serialNumber) {
-          foundSerialNumbers.add(serialNumber);
+        if (snapshot.value != null && snapshot.value is Map) {
+          final Map<dynamic, dynamic> data =
+              snapshot.value as Map<dynamic, dynamic>;
+
+          if (data.containsKey('serialNumber') &&
+              data['serialNumber'] == serialNumber &&
+              data.containsKey('uid') &&
+              data['uid'] != null) {
+            isDeviceInUse = true;
+            break;
+          }
         }
       }
 
       setState(() {
-        _isSerialNumberValid = foundSerialNumbers.isNotEmpty;
-        _areFieldsEnabled =
-            _isSerialNumberValid; // Enable fields if serial number is valid
+        _isSerialNumberValid = !isDeviceInUse;
+        _areFieldsEnabled = _isSerialNumberValid;
       });
 
-      // Provide feedback to the user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -81,28 +88,28 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
               if (_isSerialNumberValid) ...[
                 const Icon(Icons.check_circle, color: Colors.green),
               ] else ...[
-                const Icon(Icons.cancel, color: Colors.red), // Wrong icon
+                const Icon(Icons.cancel, color: Colors.red),
               ],
               const SizedBox(width: 8),
               Text(
                 _isSerialNumberValid
                     ? 'Device serial number found!'
-                    : 'Device serial number not found!',
+                    : 'Device already in use!',
                 style: TextStyle(
                   color: _isSerialNumberValid ? Colors.green : Colors.red,
                 ),
               ),
             ],
           ),
-          backgroundColor: Color.fromARGB(255, 243, 250, 244),
+          backgroundColor: const Color.fromARGB(255, 243, 250, 244),
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
       print('Error searching serial number: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Error occurred while searching.'),
+        const SnackBar(
+          content: Text('Error occurred while searching.'),
         ),
       );
     }
@@ -120,6 +127,8 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
         setState(() {
           _deviceCount = snapshot.docs.length + 1;
+          // Update _nextDbPathIndex based on the current device count
+          _nextDbPathIndex = (_deviceCount - 1) % _dbPaths.length;
         });
       } catch (e) {
         print('Error fetching device count: $e');
@@ -127,28 +136,52 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     }
   }
 
+  Future<void> _fetchNextDbPathIndex() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        QuerySnapshot snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('registered_appliances')
+            .get();
+
+        setState(() {
+          _nextDbPathIndex = snapshot.docs.length % _dbPaths.length;
+        });
+      } catch (e) {
+        print('Error fetching next dbPath index: $e');
+      }
+    }
+  }
+
   String _getSelectedApplianceType() {
-    if (_selectedApplianceIcon == Icons.lightbulb_outline) return 'lightbulb';
-    if (_selectedApplianceIcon == Icons.air) return 'fan';
-    if (_selectedApplianceIcon == Icons.tv) return 'tv';
-    if (_selectedApplianceIcon == Icons.kitchen) return 'refrigerator';
-    return 'unknown';
+    if (_selectedApplianceIcon == Icons.lightbulb_outline) {
+      return 'lightbulb';
+    } else if (_selectedApplianceIcon == Icons.air) {
+      return 'fan';
+    } else if (_selectedApplianceIcon == Icons.tv) {
+      return 'tv';
+    } else if (_selectedApplianceIcon == Icons.kitchen) {
+      return 'refrigerator';
+    } else {
+      return 'unknown';
+    }
   }
 
   Future<void> _saveApplianceData() async {
     if (_formKey.currentState!.validate() && _isSerialNumberValid) {
-      // Form is valid, proceed with saving data
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
-          // Get the data from the form fields
           String applianceName = _applianceNameController.text;
           String deviceSerialNumber = _deviceSerialNumberController.text;
           int maxUsageLimit = int.parse(_maxUsageLimitController.text);
           String applianceType = _getSelectedApplianceType();
+          String dbPath = _dbPaths[_nextDbPathIndex];
 
           // Save the appliance data to Firestore
-          await FirebaseFirestore.instance
+          DocumentReference docRef = await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .collection('registered_appliances')
@@ -156,12 +189,20 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
             'applianceName': applianceName,
             'deviceSerialNumber': deviceSerialNumber,
             'maxUsageLimit': maxUsageLimit,
-            'selectedTimeUnit': _selectedTimeUnit ?? 'hrs', // Default to 'hrs'
+            'selectedTimeUnit': _selectedTimeUnit ?? 'hrs',
             'applianceType': applianceType,
             'deviceNumber': _deviceCount,
+            'dbPath': dbPath, // Add dbPath to Firestore
           });
 
-          // Optionally, you can clear the form fields or navigate to another screen
+          // --- Send UID to Realtime Database ---
+          final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
+
+          await dbRef.child('$dbPath/uid').set(user.uid);
+          print('UID sent to Realtime Database path: $dbPath');
+
+          _nextDbPathIndex = (_nextDbPathIndex + 1) % _dbPaths.length;
+
           _applianceNameController.clear();
           _deviceSerialNumberController.clear();
           _maxUsageLimitController.clear();
@@ -170,7 +211,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
             _selectedTimeUnit = null;
             _isSerialNumberValid = false;
           });
-          _fetchDeviceCount(); // Update device count
+          _fetchDeviceCount();
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -178,7 +219,6 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
             ),
           );
 
-          // Navigate to the ApplianceListScreen
           Navigator.pushReplacementNamed(
               context, ApplianceListScreen.routeName);
         } catch (e) {
@@ -191,7 +231,6 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         }
       }
     } else {
-      // Form is not valid, show an error message or take appropriate action
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all fields correctly.'),
@@ -453,7 +492,6 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
 
                   // Save Button
