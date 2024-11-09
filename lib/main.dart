@@ -9,7 +9,8 @@ import 'package:Emon/admin/admin_page_screen.dart';
 import 'package:Emon/admin/admin_login_screen.dart';
 import 'firebase_options.dart';
 import 'package:provider/provider.dart';
-import 'package:Emon/services/global_state.dart'; // Import your global state
+import 'package:Emon/services/global_state.dart';
+import 'package:Emon/screens/appliance_list.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +19,6 @@ void main() async {
   );
   runApp(
     ChangeNotifierProvider(
-      // Provide GlobalState
       create: (context) => GlobalState(),
       child: const MyApp(),
     ),
@@ -43,6 +43,7 @@ class MyApp extends StatelessWidget {
         '/login-screen': (context) => const LoginScreen(),
         LoginScreenAdmin.routeName: (context) => const LoginScreenAdmin(),
         AdminPage.routeName: (context) => const AdminPage(),
+        ApplianceListScreen.routeName: (context) => const ApplianceListScreen(),
         DashboardScreen.routeName: (context) => DashboardScreen(),
       },
     );

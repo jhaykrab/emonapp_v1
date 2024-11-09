@@ -1,4 +1,5 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
-    "cmake.sourceDirectory": "C:/Users/Personal_PC/emonapp_v1/linux"
+    "cmake.sourceDirectory": "C:/Users/Personal_PC/emonapp_v1/linux",
+    "editor.comments.insertSpace": false
 }

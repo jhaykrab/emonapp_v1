@@ -102,7 +102,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _appliances = snapshot.docs.map((doc) {
             Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
             return Appliance(
-              name: data['name'] ?? '',
+              name: data['applianceName'] ?? '', // Use 'applianceName'
               icon:
                   applianceIcons[data['applianceType']] ?? Icons.device_unknown,
               energy: (data['energy'] ?? 0.0).toDouble(),
@@ -113,6 +113,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runtimemin: (data['runtimemin'] ?? 0).toInt(),
               runtimesec: (data['runtimesec'] ?? 0).toInt(),
               isApplianceOn: data['isOn'] ?? false,
+              documentId: doc.id,
+              serialNumber:
+                  data['deviceSerialNumber'] ?? '', // Fetch serial number
               onToggleChanged: (value) async {
                 // Implement toggle logic for each appliance in Firestore
                 try {
@@ -127,7 +130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // Handle errors, e.g., show an error message
                 }
               },
-              documentId: doc.id,
             );
           }).toList();
         });

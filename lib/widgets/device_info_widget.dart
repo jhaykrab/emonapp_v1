@@ -20,6 +20,7 @@ class Appliance {
   final int runtimesec;
   final bool isApplianceOn;
   final String documentId; // Add documentId
+  final String serialNumber; // Add serial number
   final ValueChanged<bool> onToggleChanged;
 
   Appliance({
@@ -34,6 +35,7 @@ class Appliance {
     required this.runtimesec,
     required this.isApplianceOn,
     required this.documentId,
+    required this.serialNumber, // Initialize serial number
     required this.onToggleChanged,
   });
 }
@@ -169,8 +171,6 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
 
   // Helper function to build a row for each appliance
   Widget _buildApplianceRow(Appliance appliance) {
-    const int maxNameLength = 8; // Set the maximum name length to display
-
     return Consumer<GlobalState>(
       builder: (context, globalState, child) {
         return Container(
@@ -190,32 +190,36 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
           ),
           child: Row(
             children: [
-              Icon(
-                appliance.icon,
-                size: 30,
-                color: const Color.fromARGB(255, 72, 100, 68),
-              ),
-              SizedBox(width: 8),
-              // Truncated appliance name with hover effect
-              MouseRegion(
-                onEnter: (_) => setState(() {}), // No state change on hover
-                onExit: (_) => setState(() {}), // No state change on exit
-                child: Tooltip(
-                  message: appliance.name, // Full name in tooltip
-                  preferBelow: false, // Tooltip will be above if it overlaps
-                  child: Text(
-                    appliance.name.length > maxNameLength
-                        ? '${appliance.name.substring(0, maxNameLength)}...'
-                        : appliance.name,
+              Column(
+                // Wrap icon, name, and serial number in a Column
+                children: [
+                  Icon(
+                    appliance.icon,
+                    size: 30,
+                    color: const Color.fromARGB(255, 72, 100, 68),
+                  ),
+                  SizedBox(height: 4), // Add some spacing
+                  // Display the appliance name below the icon
+                  Text(
+                    appliance.name,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: const Color.fromARGB(255, 72, 100, 68),
                     ),
                   ),
-                ),
+                  SizedBox(height: 4), // Add some spacing
+                  // Display the serial number below the name
+                  Text(
+                    '${appliance.serialNumber}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: const Color.fromARGB(255, 72, 100, 68),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: 10),
+              SizedBox(width: 30),
               // Column for readings (adjust width as needed)
               SizedBox(
                 width: 130, // Adjust width to fit content
@@ -280,7 +284,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
           .doc(user.uid)
           .collection('registered_appliances')
           .doc(documentId)
-          .update({'isOn': newValue}); 
+          .update({'isOn': newValue});
 
       // Update the appliance state in Realtime Database
       await databaseRef.child('SensorReadings/applianceState').set(newValue);
@@ -314,6 +318,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
               runtimemin: data['runtimemin']?.toInt() ?? 0,
               runtimesec: data['runtimesec']?.toInt() ?? 0,
               isApplianceOn: data['applianceState'] ?? false,
+              serialNumber: widget.appliances[i].serialNumber,
               documentId: widget.appliances[i].documentId,
               onToggleChanged: widget.appliances[i].onToggleChanged,
             );

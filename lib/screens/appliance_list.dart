@@ -11,6 +11,8 @@ import 'package:Emon/services/global_state.dart';
 import 'package:provider/provider.dart';
 
 class ApplianceListScreen extends StatefulWidget {
+  static const String routeName = '/applianceList';
+
   const ApplianceListScreen({super.key});
 
   @override
@@ -51,6 +53,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
 
   // List to store appliance data fetched from Firestore
   List<Map<String, dynamic>> _appliances = [];
+  bool _isLoading = true;
 
   // Controllers for appliance name and icon (for adding/editing)
   final TextEditingController _applianceNameController =
@@ -112,12 +115,25 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     });
   }
 
-  // Function to fetch appliance data from Firestore
   Future<void> _fetchApplianceData() async {
+    setState(() {
+      _isLoading = true; // Set loading flag to true before fetching data
+    });
+
     if (_user != null) {
-      _appliances = await _dbService.getApplianceData(_user!.uid);
-      if (mounted) {
-        setState(() {});
+      try {
+        _appliances = await _dbService.getApplianceData(_user!.uid);
+      } catch (e) {
+        print('Error fetching appliance data: $e');
+        _appliances = []; // Set to empty list on error
+        // You can also show an error message to the user here
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading =
+                false; // Set loading flag to false after fetching data or handling errors
+          });
+        }
       }
     }
   }
@@ -541,164 +557,167 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
       body: Container(
-        color: Color.fromARGB(255, 243, 250, 244),
-        child: _appliances.isEmpty
-            ? const Center(
-                child: Text('No appliances set up yet.'),
-              )
-            : ListView.builder(
-                itemCount: _appliances.length,
-                itemBuilder: (context, index) {
-                  final appliance = _appliances[index];
-                  final applianceDocId = appliance['docId'];
+          color: Color.fromARGB(255, 243, 250, 244),
+          child: _isLoading // Check if data is still loading
+              ? const Center(
+                  child: CircularProgressIndicator(), // Show loading indicator
+                )
+              : _appliances.isEmpty // Check if the list is empty after loading
+                  ? const Center(
+                      child: Text('No appliances set up yet.'),
+                    )
+                  : ListView.builder(
+                      itemCount: _appliances.length,
+                      itemBuilder: (context, index) {
+                        final appliance = _appliances[index];
 
-                  return Container(
-                    margin: const EdgeInsets.symmetric(
-                        vertical: 8.0, horizontal: 16.0),
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 223, 236, 219),
-                      borderRadius: BorderRadius.circular(12.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Column for Appliance Info
-                          Row(
-                            // Changed from Column to Row
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Appliance Icon (corrected)
-                              Icon(
-                                applianceIcons[appliance['applianceType']] ??
-                                    Icons.device_unknown,
-                                size: 40,
-                                color: const Color.fromARGB(255, 72, 100, 68),
+                        // Accessing data from the 'appliance' map
+                        final applianceDocId = appliance['docId'] ?? 'Unknown';
+                        final applianceName = appliance['applianceName'] ??
+                            'Unnamed Appliance'; // Fetching applianceName
+                        final applianceType = appliance['applianceType'];
+                        final deviceSerialNumber =
+                            appliance['deviceSerialNumber'] ?? 'N/A';
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(
+                              vertical: 8.0, horizontal: 16.0),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(255, 223, 236, 219),
+                            borderRadius: BorderRadius.circular(12.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                spreadRadius: 2,
+                                blurRadius: 5,
+                                offset: const Offset(0, 3),
                               ),
-                              const SizedBox(width: 16), // Added spacing
-                              // Wi-Fi Icon
-                              Icon(
-                                Icons.wifi,
-                                size: 24,
-                                color:
-                                    _isApplianceOn ? Colors.green : Colors.grey,
-                              ),
-                              const SizedBox(width: 16), // Added spacing
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Truncated appliance name with hover effect
-                                  MouseRegion(
-                                    onEnter: (_) => setState(() {}),
-                                    onExit: (_) => setState(() {}),
-                                    child: Tooltip(
-                                      message: appliance['name'],
-                                      preferBelow: false,
-                                      child: Text(
-                                        appliance['name'].length > maxNameLength
-                                            ? '${appliance['name'].substring(0, maxNameLength)}...'
-                                            : appliance['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      applianceIcons[applianceType] ??
+                                          Icons.device_unknown,
+                                      size: 40,
+                                      color: const Color.fromARGB(
+                                          255, 72, 100, 68),
                                     ),
-                                  ),
-                                  Text(
-                                    '${appliance['deviceNumber']}',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Constrained Runtime Text
-                                  SizedBox(
-                                    width: 120, // Adjust width as needed
-                                    child: Text(
-                                      '$_runtimeHours\h $_runtimeMinutes\m $_runtimeSeconds\s', // Remove spaces and use \ before units
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                  // Status Text
-                                  Text(
-                                    _isApplianceOn
-                                        ? 'Device Turned On'
-                                        : 'Device Turned Off',
-                                    style: TextStyle(
+                                    const SizedBox(width: 16),
+                                    Icon(
+                                      Icons.wifi,
+                                      size: 24,
                                       color: _isApplianceOn
-                                          ? Colors.green[700]
-                                          : Colors.red,
-                                      fontWeight: FontWeight.normal,
-                                      fontSize: 12,
+                                          ? Colors.green
+                                          : Colors.grey,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    const SizedBox(width: 16),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        MouseRegion(
+                                          onEnter: (_) => setState(() {}),
+                                          onExit: (_) => setState(() {}),
+                                          child: Tooltip(
+                                            message: applianceName,
+                                            preferBelow: false,
+                                            child: Text(
+                                              applianceName.length >
+                                                      maxNameLength
+                                                  ? '${applianceName.substring(0, maxNameLength)}...'
+                                                  : applianceName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Serial No: $deviceSerialNumber',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        SizedBox(
+                                          width: 120,
+                                          child: Text(
+                                            '$_runtimeHours\h $_runtimeMinutes\m $_runtimeSeconds\s',
+                                            style:
+                                                const TextStyle(fontSize: 13),
+                                          ),
+                                        ),
+                                        Text(
+                                          _isApplianceOn
+                                              ? 'Device Turned On'
+                                              : 'Device Turned Off',
+                                          style: TextStyle(
+                                            color: _isApplianceOn
+                                                ? Colors.green[700]
+                                                : Colors.red,
+                                            fontWeight: FontWeight.normal,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Switch(
+                                          value:
+                                              Provider.of<GlobalState>(context)
+                                                  .isApplianceOn,
+                                          onChanged: (value) {
+                                            Provider.of<GlobalState>(context,
+                                                    listen: false)
+                                                .isApplianceOn = value;
+                                            _databaseRef.update(
+                                                {'applianceState': value});
+                                          },
+                                          activeTrackColor: Colors.green[700],
+                                          activeColor: Colors.green[900],
+                                          inactiveTrackColor: Colors.grey[400],
+                                          inactiveThumbColor: Colors.grey[300],
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit),
+                                          onPressed: () =>
+                                              _editAppliance(index),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () =>
+                                              _showRemoveConfirmationDialog(
+                                                  index),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-
-                          // Column for Toggle, Edit, Delete, and Status
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              // Toggle Switch and Status Row
-                              Row(
-                                children: [
-                                  // Toggle Switch
-                                  Switch(
-                                    value: Provider.of<GlobalState>(context)
-                                        .isApplianceOn,
-                                    onChanged: (value) {
-                                      // Update global state
-                                      Provider.of<GlobalState>(context,
-                                              listen: false)
-                                          .isApplianceOn = value;
-
-                                      // Update Realtime Database
-                                      _databaseRef
-                                          .update({'applianceState': value});
-                                    },
-                                    activeTrackColor: Colors.green[700],
-                                    activeColor: Colors.green[900],
-                                    inactiveTrackColor: Colors.grey[400],
-                                    inactiveThumbColor: Colors.grey[300],
-                                  ),
-                                  const SizedBox(width: 8), // Added spacing
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              // Edit and Delete Buttons
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => _editAppliance(index),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Colors.red),
-                                    onPressed: () =>
-                                        _showRemoveConfirmationDialog(index),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-      ),
+                        );
+                      },
+                    )),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 20.0),
