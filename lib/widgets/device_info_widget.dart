@@ -171,6 +171,8 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
 
   // Helper function to build a row for each appliance
   Widget _buildApplianceRow(Appliance appliance) {
+    const int maxNameLength = 10; // Set the maximum name length to display
+
     return Consumer<GlobalState>(
       builder: (context, globalState, child) {
         return Container(
@@ -199,13 +201,24 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                     color: const Color.fromARGB(255, 72, 100, 68),
                   ),
                   SizedBox(height: 4), // Add some spacing
-                  // Display the appliance name below the icon
-                  Text(
-                    appliance.name,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 72, 100, 68),
+                  // Display the appliance name below the icon, truncated if necessary
+                  MouseRegion(
+                    // Add MouseRegion for hover effect
+                    onEnter: (_) => setState(() {}), // Trigger rebuild on hover
+                    onExit: (_) => setState(() {}), // Trigger rebuild on exit
+                    child: Tooltip(
+                      // Add Tooltip to show full name on hover
+                      message: appliance.name,
+                      child: Text(
+                        appliance.name.length > maxNameLength
+                            ? '${appliance.name.substring(0, maxNameLength)}...'
+                            : appliance.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color.fromARGB(255, 72, 100, 68),
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(height: 4), // Add some spacing
