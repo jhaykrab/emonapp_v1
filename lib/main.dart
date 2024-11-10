@@ -1,3 +1,4 @@
+import 'package:Emon/services/global_state.dart';
 import 'package:flutter/material.dart';
 import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:Emon/screens/SplashScreenLogo.dart';
@@ -9,7 +10,7 @@ import 'package:Emon/admin/admin_page_screen.dart';
 import 'package:Emon/admin/admin_login_screen.dart';
 import 'firebase_options.dart';
 import 'package:provider/provider.dart';
-import 'package:Emon/services/global_state.dart';
+import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
 import 'package:Emon/screens/appliance_list.dart';
 
 void main() async {
@@ -18,8 +19,12 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => GlobalState(),
+    MultiProvider(
+      // Use MultiProvider for multiple providers
+      providers: [
+        ChangeNotifierProvider(create: (context) => ApplianceProvider()),
+        ChangeNotifierProvider(create: (context) => GlobalState()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -44,7 +49,7 @@ class MyApp extends StatelessWidget {
         LoginScreenAdmin.routeName: (context) => const LoginScreenAdmin(),
         AdminPage.routeName: (context) => const AdminPage(),
         ApplianceListScreen.routeName: (context) => const ApplianceListScreen(),
-        DashboardScreen.routeName: (context) => DashboardScreen(),
+        DashboardScreen.routeName: (context) => const DashboardScreen(),
       },
     );
   }

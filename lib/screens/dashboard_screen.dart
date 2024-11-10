@@ -10,6 +10,8 @@ import 'package:Emon/widgets/app_bar_widget.dart';
 import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
 import 'package:Emon/screens/history_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:Emon/models/appliance.dart'; // Import the Appliance class
+
 import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
@@ -186,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
       body: Container(
-        color: const Color.fromARGB(255, 243, 250, 244),
+        color: Colors.white,
         child: SingleChildScrollView(
           child: Column(
             children: [

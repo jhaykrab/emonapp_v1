@@ -1,48 +1,17 @@
 import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:Emon/services/global_state.dart';
 import 'package:provider/provider.dart';
-
-// Define an Appliance class to hold data for each appliance
-class Appliance {
-  final String name; // Add appliance name
-  final IconData icon; // Add appliance icon
-  final double energy;
-  final double voltage;
-  final double current;
-  final double power;
-  final int runtimehr;
-  final int runtimemin;
-  final int runtimesec;
-  final bool isApplianceOn;
-  final String documentId; // Add documentId
-  final String serialNumber; // Add serial number
-  final ValueChanged<bool> onToggleChanged;
-
-  Appliance({
-    required this.name, // Initialize name
-    required this.icon, // Initialize icon
-    required this.energy,
-    required this.voltage,
-    required this.current,
-    required this.power,
-    required this.runtimehr,
-    required this.runtimemin,
-    required this.runtimesec,
-    required this.isApplianceOn,
-    required this.documentId,
-    required this.serialNumber, // Initialize serial number
-    required this.onToggleChanged,
-  });
-}
+import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
+import 'package:Emon/screens/appliance_list.dart'; // Import for container style
+import 'package:Emon/models/appliance.dart';
 
 class DeviceInfoWidget extends StatefulWidget {
-  final List<Appliance> appliances; // List to hold appliance data
-  final Function(Appliance) onAddAppliance; // Function to add appliances
+  final List<Appliance> appliances;
+  final Function(Appliance) onAddAppliance;
 
   const DeviceInfoWidget(
       {Key? key, required this.appliances, required this.onAddAppliance})
@@ -52,380 +21,301 @@ class DeviceInfoWidget extends StatefulWidget {
   _DeviceInfoWidgetState createState() => _DeviceInfoWidgetState();
 }
 
-class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
-    with SingleTickerProviderStateMixin {
-  bool _showDeleteIcon = false; // Flag to control delete icon visibility
-  late AnimationController _animationController; // Animation controller
+class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
   final databaseRef = FirebaseDatabase.instance.ref();
   Timestamp? _serverTimestamp;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 200), // Adjust shake duration
-    );
-    _fetchRealtimeData(); // Fetch initial data
-    _listenToApplianceState();
-    _listenToRealtimeData(); // Listen for updates
-    _fetchServerTimestamp(); // Fetch the server timestamp
+    _fetchServerTimestamp();
+    // _fetchRealtimeData(); // No need to fetch data here, the provider will handle it
+
+    // Start listening for Realtime Database updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ApplianceProvider>(context, listen: false)
+          .listenToRealtimeData();
+    });
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose(); // Dispose the animation controller
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 380, // Adjusted width
-        padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 0.0),
-        margin: EdgeInsets.only(top: 40.0),
-        decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 243, 250, 244),
-          border: Border.all(
-            color: Colors.grey[300]!,
-            width: 1.0,
-          ),
-          borderRadius: BorderRadius.circular(8.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.5),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Date and Day of the Week (Modified)
-            Center(
-              child: Text(
-                _serverTimestamp != null
-                    ? DateFormat('MMMM d, yyyy - EEEE')
-                        .format(_serverTimestamp!.toDate())
-                    : 'Loading date...', // Display while fetching
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: const Color.fromARGB(255, 72, 100, 68),
-                ),
-              ),
-            ),
-            SizedBox(height: 12),
-
-            // Dynamically generate rows for each appliance
-            ...widget.appliances.map((appliance) {
-              return _buildApplianceRow(appliance);
-            }).toList(),
-
-            SizedBox(height: 24),
-
-            // Add and Remove Device Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildElevatedButton(
-                  '  Add an Appliance  ',
-                  const Color.fromARGB(255, 54, 83, 56),
-                  () async {
-                    final newAppliance = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SetupApplianceScreen(),
-                      ),
-                    );
-
-                    // Check if newAppliance is not null (user saved an appliance)
-                    if (newAppliance != null && newAppliance is Appliance) {
-                      widget.onAddAppliance(newAppliance);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Function to fetch the server timestamp from Firestore
   Future<void> _fetchServerTimestamp() async {
     try {
-      // Get the server timestamp
-      _serverTimestamp = Timestamp.now();
-
-      setState(() {}); // Update the UI
+      DocumentReference<Map<String, dynamic>> serverTimestampRef =
+          FirebaseFirestore.instance.collection('server').doc('timestamp');
+      await serverTimestampRef.set({'timestamp': FieldValue.serverTimestamp()});
+      DocumentSnapshot<Map<String, dynamic>> snapshot =
+          await serverTimestampRef.get();
+      _serverTimestamp = snapshot['timestamp'] as Timestamp;
+      setState(() {});
     } catch (e) {
       print('Error fetching server timestamp: $e');
-      // Handle errors, e.g., show an error message
     }
   }
 
-  // Helper function to build a row for each appliance
-  Widget _buildApplianceRow(Appliance appliance) {
-    const int maxNameLength = 10; // Set the maximum name length to display
+  String _getDbPathForSerialNumber(String serialNumber) {
+    switch (serialNumber) {
+      case '11032401':
+        return 'SensorReadings';
+      case '11032402':
+        return 'SensorReadings_2';
+      case '11032403':
+        return 'SensorReadings_3';
+      default:
+        return '';
+    }
+  }
 
-    return Consumer<GlobalState>(
-      builder: (context, globalState, child) {
-        return Container(
-          padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 10.0),
-          margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 10.0),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 223, 236, 219),
-            borderRadius: BorderRadius.circular(8.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 3,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
+  // No need for _fetchRealtimeData() as the provider handles data fetching
+
+  Widget _buildApplianceRow(Appliance appliance) {
+    final applianceProvider = Provider.of<ApplianceProvider>(context);
+    const int maxNameLength = 12; // Set the maximum name length for truncation
+
+    return _buildDeviceInfoContainer(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                // Wrap icon, name, and serial number in a Column
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Icon(
                     appliance.icon,
                     size: 30,
                     color: const Color.fromARGB(255, 72, 100, 68),
                   ),
-                  SizedBox(height: 4), // Add some spacing
-                  // Display the appliance name below the icon, truncated if necessary
-                  MouseRegion(
-                    // Add MouseRegion for hover effect
-                    onEnter: (_) => setState(() {}), // Trigger rebuild on hover
-                    onExit: (_) => setState(() {}), // Trigger rebuild on exit
-                    child: Tooltip(
-                      // Add Tooltip to show full name on hover
-                      message: appliance.name,
-                      child: Text(
-                        appliance.name.length > maxNameLength
-                            ? '${appliance.name.substring(0, maxNameLength)}...'
-                            : appliance.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: const Color.fromARGB(255, 72, 100, 68),
+                  const SizedBox(width: 10),
+                  Icon(
+                    Icons.wifi,
+                    size: 16,
+                    color: appliance.isApplianceOn ? Colors.green : Colors.grey,
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Truncated appliance name with tooltip
+                      MouseRegion(
+                        onEnter: (_) => setState(() {}),
+                        onExit: (_) => setState(() {}),
+                        child: Tooltip(
+                          message: appliance.name,
+                          preferBelow: false,
+                          child: Text(
+                            appliance.name.length > maxNameLength
+                                ? '${appliance.name.substring(0, maxNameLength)}...'
+                                : appliance.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  SizedBox(height: 4), // Add some spacing
-                  // Display the serial number below the name
-                  Text(
-                    '${appliance.serialNumber}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
+                      Text(
+                        'Serial: ${appliance.serialNumber}',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: 80,
+                        child: Consumer<ApplianceProvider>(
+                          builder: (context, provider, child) {
+                            // Find the appliance in the provider
+                            Appliance currentAppliance =
+                                provider.appliances.firstWhere(
+                              (a) => a.serialNumber == appliance.serialNumber,
+                              orElse: () =>
+                                  appliance, // Return the original appliance if not found
+                            );
+                            return Text(
+                              '${currentAppliance.runtimehr}h ${currentAppliance.runtimemin}m ${currentAppliance.runtimesec}s',
+                              style: const TextStyle(fontSize: 11),
+                            );
+                          },
+                        ),
+                      ),
+                      Text(
+                        appliance.isApplianceOn ? 'Device On' : 'Device Off',
+                        style: TextStyle(
+                          color: appliance.isApplianceOn
+                              ? Colors.green[700]
+                              : Colors.red,
+                          fontWeight: FontWeight.normal,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              SizedBox(width: 30),
-              // Column for readings (adjust width as needed)
-              SizedBox(
-                width: 130, // Adjust width to fit content
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildReadingRow('Energy:',
-                        '${appliance.energy.toStringAsFixed(2)} kWh'),
-                    _buildReadingRow('Voltage:',
-                        '${appliance.voltage.toStringAsFixed(1)} V'), // Added back Voltage
-                    _buildReadingRow('Current:',
-                        '${appliance.current.toStringAsFixed(2)} A'), // Added back Current
-                    _buildReadingRow(
-                        'Power:', '${appliance.power.toStringAsFixed(1)} W'),
-                    _buildReadingRow('Runtime:',
-                        '${appliance.runtimehr}:${appliance.runtimemin}:${appliance.runtimesec}'),
-                  ],
-                ),
-              ),
-              Spacer(),
-              Transform.scale(
-                scale: 0.7,
-                child: Switch(
-                  value: globalState.isApplianceOn,
-                  onChanged: (value) {
-                    globalState.isApplianceOn = value;
-                    _toggleAppliance(appliance.documentId, value);
-                  },
-                  activeTrackColor: Colors.green[700],
-                  activeColor: Colors.green[900],
-                  inactiveTrackColor: Colors.grey[400],
-                  inactiveThumbColor: Colors.grey[300],
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.delete, color: Colors.red),
-                iconSize: 24,
-                onPressed: () {
-                  _showDeleteConfirmationDialog(appliance.documentId);
-                },
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      Transform.scale(
+                        scale: 0.75,
+                        child: Switch(
+                          value: appliance.isApplianceOn,
+                          onChanged: (value) async {
+                            setState(() {
+                              appliance.isApplianceOn = value;
+                            });
+                            await applianceProvider.toggleAppliance(
+                                appliance, value);
+                          },
+                          activeTrackColor: Colors.green[700],
+                          activeColor: Colors.green[900],
+                          inactiveTrackColor: Colors.grey[400],
+                          inactiveThumbColor: Colors.grey[300],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 18),
+                        onPressed: () {},
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete,
+                            color: Colors.red, size: 18),
+                        onPressed: () =>
+                            _showDeleteConfirmationDialog(appliance),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Function to toggle appliance state in Firestore and Realtime Database
-  Future<void> _toggleAppliance(String documentId, bool newValue) async {
-    try {
-      // Get the current user's UID
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('User not logged in!');
-        return;
-      }
-
-      // Update the 'isOn' field in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('registered_appliances')
-          .doc(documentId)
-          .update({'isOn': newValue});
-
-      // Update the appliance state in Realtime Database
-      await databaseRef.child('SensorReadings/applianceState').set(newValue);
-
-      print('Appliance state updated successfully!');
-    } catch (e) {
-      print('Error updating appliance state: $e');
-      // Handle errors, e.g., show an error message
-    }
-  }
-
-  // Function to fetch Realtime Database readings
-  Future<void> _fetchRealtimeData() async {
-    try {
-      DatabaseEvent event = await databaseRef.child('SensorReadings').once();
-      DataSnapshot snapshot = event.snapshot;
-      if (snapshot.value != null) {
-        Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-
-        setState(() {
-          // Update the Appliance objects in the list
-          for (var i = 0; i < widget.appliances.length; i++) {
-            widget.appliances[i] = Appliance(
-              name: widget.appliances[i].name,
-              icon: widget.appliances[i].icon,
-              energy: data['energy']?.toDouble() ?? 0.0,
-              voltage: data['voltage']?.toDouble() ?? 0.0,
-              current: data['current']?.toDouble() ?? 0.0,
-              power: data['power']?.toDouble() ?? 0.0,
-              runtimehr: data['runtimehr']?.toInt() ?? 0,
-              runtimemin: data['runtimemin']?.toInt() ?? 0,
-              runtimesec: data['runtimesec']?.toInt() ?? 0,
-              isApplianceOn: data['applianceState'] ?? false,
-              serialNumber: widget.appliances[i].serialNumber,
-              documentId: widget.appliances[i].documentId,
-              onToggleChanged: widget.appliances[i].onToggleChanged,
-            );
-          }
-        });
-      }
-    } catch (e) {
-      print('Error fetching Realtime Database data: $e');
-      // Handle errors, e.g., show an error message
-    }
-  }
-
-  void _listenToApplianceState() {
-    databaseRef.child('SensorReadings/applianceState').onValue.listen((event) {
-      bool newApplianceState = event.snapshot.value as bool? ?? false;
-
-      // Update the global state
-      Provider.of<GlobalState>(context, listen: false).isApplianceOn =
-          newApplianceState;
-    });
-  }
-
-  // Function to listen for Realtime Database updates
-  void _listenToRealtimeData() {
-    databaseRef.child('SensorReadings').onValue.listen((event) {
-      if (event.snapshot.value != null) {
-        Map<dynamic, dynamic> data =
-            event.snapshot.value as Map<dynamic, dynamic>;
-        _fetchRealtimeData(); // Update the appliance data
-      }
-    });
-  }
-
-  // Helper function to build a row for each reading
-  Widget _buildReadingRow(String label, String value) {
-    return Row(
-      children: [
-        Text(
-          '$label ',
-          style: TextStyle(
-            fontSize: 12, // Reduced font size
-            color: const Color.fromARGB(255, 72, 100, 68),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12, // Reduced font size
-            fontWeight: FontWeight.bold,
-            color: const Color.fromARGB(255, 72, 100, 68),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Helper function to build elevated buttons
-  Widget _buildElevatedButton(
-      String label, Color color, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        minimumSize: Size(160, 40),
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.normal,
-          color: Colors.white,
-        ),
+          );
+        },
       ),
     );
   }
 
-  // Function to show a confirmation dialog before removing a device
-  Future<void> _showDeleteConfirmationDialog(String documentId) async {
+  // Function to build the container for DeviceInfoWidget
+  Widget _buildDeviceInfoContainer(Widget child) {
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.65,
+      padding: EdgeInsets.all(8.0),
+      margin: EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 223, 236, 219),
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: MediaQuery.of(context).size.width * 0.75,
+            padding: EdgeInsets.all(8.0),
+            margin: EdgeInsets.only(top: 20.0),
+            decoration: BoxDecoration(
+              color: Color.fromARGB(255, 243, 250, 244),
+              border: Border.all(color: Colors.grey[300]!, width: 1.0),
+              borderRadius: BorderRadius.circular(6.0),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Center(
+                  child: Text(
+                    _serverTimestamp != null
+                        ? DateFormat('MMMM d, yyyy - EEEE')
+                            .format(_serverTimestamp!.toDate())
+                        : 'Loading date...',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: const Color.fromARGB(255, 54, 83, 56)),
+                  ),
+                ),
+                SizedBox(height: 6),
+                Consumer<ApplianceProvider>(
+                  // Use Consumer to rebuild when appliance state changes
+                  builder: (context, applianceProvider, child) {
+                    return Column(
+                      children: applianceProvider.appliances
+                          .map(_buildApplianceRow)
+                          .toList(),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SetupApplianceScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 54, 83, 56),
+              foregroundColor: const Color(0xFFe8f5e9),
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6.0),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add, size: 16),
+                SizedBox(width: 6),
+                Text('Add Appliance'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDeleteConfirmationDialog(Appliance appliance) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: false, // user must tap button!
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(
-            'Delete Device',
+          title: const Text(
+            'Remove Appliance',
             style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
           ),
-          content: SingleChildScrollView(
+          content: const SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 Text(
-                  'Are you sure you want to delete this device?',
+                  'Are you sure you want to remove this appliance?',
                   style: TextStyle(color: Color.fromARGB(255, 22, 22, 22)),
                 ),
               ],
@@ -433,41 +323,61 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
           ),
           actions: <Widget>[
             TextButton(
-              child: Text(
+              child: const Text(
                 'Cancel',
                 style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
               ),
               onPressed: () {
-                setState(() {
-                  _showDeleteIcon = false;
-                });
                 Navigator.of(context).pop();
-                _animationController.reset();
               },
             ),
             TextButton(
-              child: Text(
-                'Confirm',
+              child: const Text(
+                'Remove',
                 style: TextStyle(color: Color.fromARGB(255, 114, 18, 18)),
               ),
               onPressed: () async {
-                try {
-                  // Get the current user's UID
-                  User? user = FirebaseAuth.instance.currentUser;
-                  if (user == null) {
-                    print('User not logged in!');
-                    return;
-                  }
+                final applianceDocId = appliance.documentId;
+                final applianceSerialNumber = appliance.serialNumber;
+                final applianceProvider =
+                    Provider.of<ApplianceProvider>(context, listen: false);
 
-                  // Delete the document from Firestore
+                try {
+                  // Remove appliance data from Firestore
                   await FirebaseFirestore.instance
                       .collection('users')
-                      .doc(user.uid)
+                      .doc(FirebaseAuth.instance.currentUser!.uid)
                       .collection('registered_appliances')
-                      .doc(documentId)
+                      .doc(applianceDocId)
                       .delete();
 
-                  // Show a success message (optional)
+                  // --- Remove UID from Realtime Database ---
+                  final DatabaseReference dbRef = FirebaseDatabase.instance
+                      .ref(); // Declare dbRef only once
+                  List<String> paths = [
+                    'SensorReadings',
+                    'SensorReadings_2',
+                    'SensorReadings_3',
+                  ];
+
+                  for (String path in paths) {
+                    final DataSnapshot snapshot =
+                        await dbRef.child('$path/serialNumber').get();
+
+                    if (snapshot.value != null &&
+                        snapshot.value.toString() == applianceSerialNumber) {
+                      // Found matching serial number, remove UID field
+                      await dbRef.child('$path/uid').remove();
+                      print(
+                          'UID field removed from Realtime Database path: $path');
+                      break; // Stop searching after finding a match
+                    }
+                  }
+
+                  // Update the _appliances list in the provider
+                  applianceProvider.removeAppliance(appliance);
+
+                  // Show success message
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Row(
@@ -475,7 +385,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                           Icon(Icons.check_circle, color: Colors.green),
                           SizedBox(width: 8),
                           Text(
-                            'Appliance deleted successfully!',
+                            'Appliance removed successfully!',
                             style: TextStyle(
                               color: Color.fromARGB(
                                   255, 54, 83, 56), // Dark green text
@@ -487,16 +397,28 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget>
                           255, 193, 223, 194), // Light green background
                     ),
                   );
-
-                  // Remove the appliance from the list
-                  setState(() {
-                    widget.appliances.removeWhere(
-                        (appliance) => appliance.documentId == documentId);
-                  });
                 } catch (e) {
-                  print('Error deleting appliance: $e');
-                  // Handle errors, e.g., show an error message
+                  // Handle errors
+                  print('Error removing appliance: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.error, color: Colors.red), // Error icon
+                          SizedBox(width: 8),
+                          Text(
+                            'Failed to remove appliance.',
+                            style: TextStyle(
+                              color: Colors.white, // White text
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Colors.red, // Red background
+                    ),
+                  );
                 }
+
                 Navigator.of(context).pop();
               },
             ),
