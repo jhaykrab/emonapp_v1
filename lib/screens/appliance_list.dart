@@ -11,6 +11,7 @@ import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
 import 'package:Emon/models/appliance.dart';
+import 'package:Emon/constants.dart'; // Import your constants file
 
 class ApplianceListScreen extends StatefulWidget {
   static const String routeName = '/applianceList';
@@ -27,22 +28,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
   String _userName = '';
   UserData? _userData;
 
-  // Define a map of icon constants
-  static const Map<String, IconData> applianceIcons = {
-    'lightbulb': Icons.lightbulb_outline,
-    'fan': Icons.air,
-    'tv': Icons.tv,
-    'refrigerator': Icons.kitchen,
-    // Add more appliance types and icons as needed
-  };
-
   final DatabaseService _dbService = DatabaseService();
-
-  // Define IconData constants for dropdown
-  static const IconData iconLightbulb = Icons.lightbulb_outline;
-  static const IconData iconFan = Icons.air;
-  static const IconData iconTv = Icons.tv;
-  static const IconData iconRefrigerator = Icons.kitchen;
 
   // List to store appliance data fetched from Firestore
   List<Map<String, dynamic>> _appliances = [];
@@ -153,25 +139,12 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                       _selectedApplianceIcon = newValue;
                     });
                   },
-                  items: const [
-                    DropdownMenuItem(
-                      value: Icons.lightbulb_outline,
-                      child: Icon(Icons.lightbulb_outline),
-                    ),
-                    DropdownMenuItem(
-                      value: Icons.air,
-                      child: Icon(Icons.air),
-                    ),
-                    DropdownMenuItem(
-                      value: Icons.tv,
-                      child: Icon(Icons.tv),
-                    ),
-                    DropdownMenuItem(
-                      value: Icons.kitchen,
-                      child: Icon(Icons.kitchen),
-                    ),
-                    // Add more icons as needed
-                  ],
+                  items: applianceIcons.entries.map((entry) {
+                    return DropdownMenuItem(
+                      value: entry.value,
+                      child: Icon(entry.value),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -202,6 +175,8 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                     'runtimehr': 0,
                     'runtimemin': 0,
                     'runtimesec': 0,
+                    'applianceType': applianceIcons.keys.firstWhere(
+                        (k) => applianceIcons[k] == _selectedApplianceIcon),
                   };
 
                   try {
@@ -264,70 +239,78 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     );
   }
 
-  Future<void> _editAppliance(int index) async {
-    final appliance = _appliances[index];
-    final applianceDocId = appliance['docId'];
+  // Controllers for editing appliance name and icon
+  final TextEditingController _editNameController = TextEditingController();
+  IconData? _selectedEditIcon;
 
-    // Set initial values for the controllers and selected icon
-    _applianceNameController.text = appliance['name'];
-    _selectedApplianceIcon =
-        applianceIcons[appliance['applianceType']] ?? Icons.device_unknown;
-    // Show a dialog to edit appliance name, icon, and device number
+  Future<void> _showEditDialog(Appliance appliance, int index) async {
+    _editNameController.text = appliance.name;
+    _selectedEditIcon = appliance.icon;
+
     await showDialog(
       context: context,
       builder: (BuildContext context) {
-        const int maxNameLength = 15; // Set the maximum name length to display
         return AlertDialog(
-          title: const Text('Edit Appliance'),
+          title: const Text(
+            'Edit Appliance',
+            style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Device Number Input Field
-                TextFormField(
-                  initialValue: appliance['deviceNumber']
-                      .toString(), // Display current device number
-                  decoration: const InputDecoration(labelText: 'Device Number'),
-                  keyboardType: TextInputType.number, // Allow only numbers
-                  onChanged: (value) {
-                    // You can add validation here if needed
-                    appliance['deviceNumber'] = int.tryParse(value) ?? 0;
-                  },
-                ),
-                const SizedBox(height: 16),
                 TextField(
-                  controller: _applianceNameController,
-                  decoration:
-                      const InputDecoration(labelText: 'Appliance Name'),
+                  controller: _editNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Appliance Name',
+                    labelStyle: TextStyle(
+                      color: Color.fromARGB(255, 54, 83, 56),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Color.fromARGB(255, 54, 83, 56),
+                      ),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Color.fromARGB(255, 54, 83, 56),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                DropdownButton<IconData>(
-                  value: _selectedApplianceIcon,
-                  hint: const Text('Select Icon'),
-                  onChanged: (IconData? newValue) {
-                    setState(() {
-                      _selectedApplianceIcon = newValue;
-                    });
+                StatefulBuilder(
+                  // Wrap DropdownButton in StatefulBuilder
+                  builder: (context, setState) {
+                    return Row(
+                      // Use a Row to display the icon and dropdown
+                      children: [
+                        Expanded(
+                          // Expand the dropdown to fill the remaining space
+                          child: DropdownButton<IconData>(
+                            value: _selectedEditIcon,
+                            // Remove the hint text
+                            icon: const Icon(
+                              Icons.arrow_drop_down,
+                              color: Color.fromARGB(255, 54, 83, 56),
+                            ),
+                            onChanged: (IconData? newValue) {
+                              setState(() {
+                                // Call setState of StatefulBuilder
+                                _selectedEditIcon = newValue;
+                              });
+                            },
+                            items: applianceIcons.entries.map((entry) {
+                              return DropdownMenuItem(
+                                value: entry.value,
+                                child: Icon(entry.value),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    );
                   },
-                  items: const [
-                    DropdownMenuItem(
-                      value: iconLightbulb, // Use constant
-                      child: Icon(iconLightbulb),
-                    ),
-                    DropdownMenuItem(
-                      value: iconFan, // Use constant
-                      child: Icon(iconFan),
-                    ),
-                    DropdownMenuItem(
-                      value: iconTv, // Use constant
-                      child: Icon(iconTv),
-                    ),
-                    DropdownMenuItem(
-                      value: iconRefrigerator, // Use constant
-                      child: Icon(iconRefrigerator),
-                    ),
-                    // Add more icons as needed
-                  ],
                 ),
               ],
             ),
@@ -337,92 +320,14 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Color.fromARGB(255, 212, 28, 28)),
+                style: TextStyle(color: Colors.red),
               ),
             ),
             TextButton(
               onPressed: () async {
-                if (_applianceNameController.text.isNotEmpty &&
-                    _selectedApplianceIcon != null) {
-                  // Create a map with the updated appliance data
-                  Map<String, dynamic> updatedApplianceData = {
-                    'icon': _selectedApplianceIcon?.codePoint,
-                    'name': _applianceNameController.text,
-                    'deviceNumber': appliance[
-                        'deviceNumber'], // Include updated device number
-                  };
-
-                  try {
-                    // Update appliance data in Firestore
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(_user!.uid)
-                        .collection('registered_appliances')
-                        .doc(applianceDocId)
-                        .update(updatedApplianceData);
-
-                    // Update the _appliances list
-                    setState(() {
-                      _appliances[index] = {
-                        ..._appliances[index],
-                        ...updatedApplianceData,
-                      };
-                    });
-
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.green),
-                            SizedBox(width: 8),
-                            Text(
-                              'Appliance updated successfully!',
-                              style: TextStyle(
-                                color: Color.fromARGB(
-                                    255, 54, 83, 56), // Dark green text
-                              ),
-                            ),
-                          ],
-                        ),
-                        backgroundColor: Color.fromARGB(
-                            255, 193, 223, 194), // Light green background
-                      ),
-                    );
-                  } catch (e) {
-                    // Handle errors
-                    print('Error updating appliance: $e');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.error, color: Colors.red), // Error icon
-                            SizedBox(width: 8),
-                            Text(
-                              'Failed to update appliance.',
-                              style: TextStyle(
-                                color: Colors.white, // White text
-                              ),
-                            ),
-                          ],
-                        ),
-                        backgroundColor: Colors.red, // Red background
-                      ),
-                    );
-                  } finally {
-                    // Clear the controllers and selected icon
-                    _applianceNameController.clear();
-                    _selectedApplianceIcon = null;
-                    Navigator.pop(context); // Close the dialog
-                  }
-                } else {
-                  // Show an error message if name or icon is not selected
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a name and select an icon.'),
-                    ),
-                  );
-                }
+                // Call the update function
+                _updateAppliance(appliance, index);
+                Navigator.pop(context);
               },
               child: const Text(
                 'Save',
@@ -435,8 +340,26 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     );
   }
 
+  // Function to update the appliance
+  Future<void> _updateAppliance(Appliance appliance, int index) async {
+    final applianceProvider =
+        Provider.of<ApplianceProvider>(context, listen: false);
+
+    // Update the appliance in the provider
+    applianceProvider.editAppliance(
+      appliance,
+      _editNameController.text,
+      _selectedEditIcon!,
+      applianceIcons,
+    );
+
+    // Clear the controllers
+    _editNameController.clear();
+    _selectedEditIcon = null;
+  }
+
   // Function to show a confirmation dialog before removing an appliance
-  Future<void> _showRemoveConfirmationDialog(int index) async {
+  Future<void> _showRemoveConfirmationDialog(Appliance appliance) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false, // user must tap button!
@@ -472,15 +395,16 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                 style: TextStyle(color: Color.fromARGB(255, 114, 18, 18)),
               ),
               onPressed: () async {
-                final appliance = _appliances[index];
-                final applianceDocId = appliance['docId'];
-                final applianceSerialNumber = appliance['deviceSerialNumber'];
+                final applianceDocId = appliance.documentId;
+                final applianceSerialNumber = appliance.serialNumber;
+                final applianceProvider =
+                    Provider.of<ApplianceProvider>(context, listen: false);
 
                 try {
                   // Remove appliance data from Firestore
                   await FirebaseFirestore.instance
                       .collection('users')
-                      .doc(_user!.uid)
+                      .doc(FirebaseAuth.instance.currentUser!.uid)
                       .collection('registered_appliances')
                       .doc(applianceDocId)
                       .delete();
@@ -508,10 +432,9 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                     }
                   }
 
-                  // Update the _appliances list
-                  setState(() {
-                    _appliances.removeAt(index);
-                  });
+                  // Update the _appliances list in the provider
+                  applianceProvider.removeAppliance(appliance);
+
                   // Show success message
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -763,14 +686,15 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                                               IconButton(
                                                 icon: const Icon(Icons.edit),
                                                 onPressed: () =>
-                                                    _editAppliance(index),
+                                                    _showEditDialog(
+                                                        appliance, index),
                                               ),
                                               IconButton(
                                                 icon: const Icon(Icons.delete,
                                                     color: Colors.red),
                                                 onPressed: () =>
                                                     _showRemoveConfirmationDialog(
-                                                        index),
+                                                        appliance),
                                               ),
                                             ],
                                           ),

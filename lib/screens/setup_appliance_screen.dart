@@ -57,6 +57,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     if (serialNumber.isEmpty) return;
 
     final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
+    bool isDeviceAvailable = false;
     bool isDeviceInUse = false;
     try {
       for (String path in _dbPaths) {
@@ -67,17 +68,20 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
               snapshot.value as Map<dynamic, dynamic>;
 
           if (data.containsKey('serialNumber') &&
-              data['serialNumber'] == serialNumber &&
-              data.containsKey('uid') &&
-              data['uid'] != null) {
-            isDeviceInUse = true;
+              data['serialNumber'] == serialNumber) {
+            isDeviceAvailable = true;
+
+            // Check if uid exists for this serial number
+            if (data.containsKey('uid') && data['uid'] != null) {
+              isDeviceInUse = true;
+            }
             break;
           }
         }
       }
 
       setState(() {
-        _isSerialNumberValid = !isDeviceInUse;
+        _isSerialNumberValid = isDeviceAvailable && !isDeviceInUse;
         _areFieldsEnabled = _isSerialNumberValid;
       });
 
@@ -85,20 +89,34 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         SnackBar(
           content: Row(
             children: [
-              if (_isSerialNumberValid) ...[
+              if (isDeviceAvailable && !isDeviceInUse) ...[
                 const Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 8),
+                const Text(
+                  'Device Available!',
+                  style: TextStyle(
+                    color: Colors.green,
+                  ),
+                ),
+              ] else if (isDeviceInUse) ...[
+                const Icon(Icons.cancel, color: Colors.red),
+                const SizedBox(width: 8),
+                const Text(
+                  'Device in use. Please enter a new one.',
+                  style: TextStyle(
+                    color: Colors.red,
+                  ),
+                ),
               ] else ...[
                 const Icon(Icons.cancel, color: Colors.red),
-              ],
-              const SizedBox(width: 8),
-              Text(
-                _isSerialNumberValid
-                    ? 'Device serial number found!'
-                    : 'Device already in use!',
-                style: TextStyle(
-                  color: _isSerialNumberValid ? Colors.green : Colors.red,
+                const SizedBox(width: 8),
+                const Text(
+                  'No device for that serial number yet. Please enter a new one.',
+                  style: TextStyle(
+                    color: Colors.red,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           backgroundColor: const Color.fromARGB(255, 243, 250, 244),
@@ -214,8 +232,24 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           _fetchDeviceCount();
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Appliance saved successfully!'),
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text(
+                    'Appliance saved successfully!',
+                    style: TextStyle(
+                      color: Color.fromARGB(255, 54, 83, 56), // Dark green text
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.white, // White background
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                side: BorderSide(color: Colors.green), // Green outline
+              ),
             ),
           );
 
@@ -224,16 +258,44 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         } catch (e) {
           print('Error saving appliance data: $e');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Error saving appliance data.'),
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text(
+                    'Error saving appliance data.',
+                    style: TextStyle(color: Colors.white), // White text
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red, // Red background
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                side: BorderSide(color: Colors.red), // Red outline
+              ),
             ),
           );
         }
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields correctly.'),
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_outlined, color: Colors.orange),
+              SizedBox(width: 8),
+              Text(
+                'Please fill in all fields correctly.',
+                style: TextStyle(color: Colors.white), // White text
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange, // Orange background
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            side: BorderSide(color: Colors.orange), // Orange outline
+          ),
         ),
       );
     }
@@ -503,10 +565,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
                   // Save Button
                   ElevatedButton(
-                    onPressed:
-                        _isSerialNumberValid // Enable button only if serial number is valid
-                            ? _saveApplianceData
-                            : null, // Call the save function
+                    onPressed: _isSerialNumberValid ? _saveApplianceData : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                       padding: const EdgeInsets.symmetric(

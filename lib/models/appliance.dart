@@ -2,19 +2,19 @@
 import 'package:flutter/material.dart';
 
 class Appliance {
-  final String name;
-  final IconData icon;
-  final double energy;
-  final double voltage;
-  final double current;
-  final double power;
-  final int runtimehr;
-  final int runtimemin;
-  final int runtimesec;
-  bool isApplianceOn; // Make mutable to allow instant toggle
-  final String documentId;
-  final String serialNumber;
-  final ValueChanged<bool> onToggleChanged;
+  String name;
+  IconData icon;
+  double energy;
+  double voltage;
+  double current;
+  double power;
+  int runtimehr;
+  int runtimemin;
+  int runtimesec;
+  bool isApplianceOn;
+  String documentId;
+  String serialNumber;
+  final Function(bool) onToggleChanged;
   String dbPath;
 
   Appliance({
@@ -31,6 +31,41 @@ class Appliance {
     required this.documentId,
     required this.serialNumber,
     required this.onToggleChanged,
-    this.dbPath = 'SensorReadings',
+    required this.dbPath,
   });
+
+  // Add the copyWith method
+  Appliance copyWith({
+    String? name,
+    IconData? icon,
+    double? energy,
+    double? voltage,
+    double? current,
+    double? power,
+    int? runtimehr,
+    int? runtimemin,
+    int? runtimesec,
+    bool? isApplianceOn,
+    String? documentId,
+    String? serialNumber,
+    Function(bool)? onToggleChanged,
+    String? dbPath,
+  }) {
+    return Appliance(
+      name: name ?? this.name,
+      icon: icon ?? this.icon,
+      energy: energy ?? this.energy,
+      voltage: voltage ?? this.voltage,
+      current: current ?? this.current,
+      power: power ?? this.power,
+      runtimehr: runtimehr ?? this.runtimehr,
+      runtimemin: runtimemin ?? this.runtimemin,
+      runtimesec: runtimesec ?? this.runtimesec,
+      isApplianceOn: isApplianceOn ?? this.isApplianceOn,
+      documentId: documentId ?? this.documentId,
+      serialNumber: serialNumber ?? this.serialNumber,
+      onToggleChanged: onToggleChanged ?? this.onToggleChanged,
+      dbPath: dbPath ?? this.dbPath,
+    );
+  }
 }

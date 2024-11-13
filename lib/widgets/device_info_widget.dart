@@ -6,8 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
-import 'package:Emon/screens/appliance_list.dart'; // Import for container style
 import 'package:Emon/models/appliance.dart';
+import 'package:Emon/constants.dart'; // Import your constants file
 
 class DeviceInfoWidget extends StatefulWidget {
   final List<Appliance> appliances;
@@ -23,13 +23,17 @@ class DeviceInfoWidget extends StatefulWidget {
 
 class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
   final databaseRef = FirebaseDatabase.instance.ref();
-  Timestamp? _serverTimestamp;
+  DateTime? _serverDate; // Store the date as DateTime
+  late Future<void> _serverDateFuture; // Future for _fetchServerDate
+
+  // Controllers for editing appliance name and icon
+  final TextEditingController _editNameController = TextEditingController();
+  IconData? _selectedEditIcon;
 
   @override
   void initState() {
     super.initState();
-    _fetchServerTimestamp();
-    // _fetchRealtimeData(); // No need to fetch data here, the provider will handle it
+    _serverDateFuture = _fetchServerDate(); // Initialize the future
 
     // Start listening for Realtime Database updates
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,14 +42,19 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
     });
   }
 
-  Future<void> _fetchServerTimestamp() async {
+  Future<void> _fetchServerDate() async {
     try {
       DocumentReference<Map<String, dynamic>> serverTimestampRef =
           FirebaseFirestore.instance.collection('server').doc('timestamp');
       await serverTimestampRef.set({'timestamp': FieldValue.serverTimestamp()});
       DocumentSnapshot<Map<String, dynamic>> snapshot =
           await serverTimestampRef.get();
-      _serverTimestamp = snapshot['timestamp'] as Timestamp;
+      Timestamp timestamp = snapshot['timestamp'] as Timestamp;
+      _serverDate = timestamp.toDate();
+
+      // Update isLoading in ApplianceProvider
+      Provider.of<ApplianceProvider>(context, listen: false).isLoading = false;
+
       setState(() {});
     } catch (e) {
       print('Error fetching server timestamp: $e');
@@ -65,136 +74,125 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
     }
   }
 
-  // No need for _fetchRealtimeData() as the provider handles data fetching
-
-  Widget _buildApplianceRow(Appliance appliance) {
+  Widget _buildApplianceRow(Appliance appliance, int index) {
     final applianceProvider = Provider.of<ApplianceProvider>(context);
     const int maxNameLength = 12; // Set the maximum name length for truncation
 
     return _buildDeviceInfoContainer(
-      StatefulBuilder(
-        builder: (context, setState) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(
-                    appliance.icon,
-                    size: 30,
-                    color: const Color.fromARGB(255, 72, 100, 68),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(
-                    Icons.wifi,
-                    size: 16,
-                    color: appliance.isApplianceOn ? Colors.green : Colors.grey,
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Truncated appliance name with tooltip
-                      MouseRegion(
-                        onEnter: (_) => setState(() {}),
-                        onExit: (_) => setState(() {}),
-                        child: Tooltip(
-                          message: appliance.name,
-                          preferBelow: false,
-                          child: Text(
-                            appliance.name.length > maxNameLength
-                                ? '${appliance.name.substring(0, maxNameLength)}...'
-                                : appliance.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'Serial: ${appliance.serialNumber}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        width: 80,
-                        child: Consumer<ApplianceProvider>(
-                          builder: (context, provider, child) {
-                            // Find the appliance in the provider
-                            Appliance currentAppliance =
-                                provider.appliances.firstWhere(
-                              (a) => a.serialNumber == appliance.serialNumber,
-                              orElse: () =>
-                                  appliance, // Return the original appliance if not found
-                            );
-                            return Text(
-                              '${currentAppliance.runtimehr}h ${currentAppliance.runtimemin}m ${currentAppliance.runtimesec}s',
-                              style: const TextStyle(fontSize: 11),
-                            );
-                          },
-                        ),
-                      ),
-                      Text(
-                        appliance.isApplianceOn ? 'Device On' : 'Device Off',
-                        style: TextStyle(
-                          color: appliance.isApplianceOn
-                              ? Colors.green[700]
-                              : Colors.red,
-                          fontWeight: FontWeight.normal,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              Icon(
+                appliance.icon,
+                size: 30,
+                color: const Color.fromARGB(255, 72, 100, 68),
               ),
+              const SizedBox(width: 10),
+              Icon(
+                Icons.wifi,
+                size: 16,
+                color: appliance.isApplianceOn ? Colors.green : Colors.grey,
+              ),
+              const SizedBox(width: 10),
               Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Transform.scale(
-                        scale: 0.75,
-                        child: Switch(
-                          value: appliance.isApplianceOn,
-                          onChanged: (value) async {
-                            setState(() {
-                              appliance.isApplianceOn = value;
-                            });
-                            await applianceProvider.toggleAppliance(
-                                appliance, value);
-                          },
-                          activeTrackColor: Colors.green[700],
-                          activeColor: Colors.green[900],
-                          inactiveTrackColor: Colors.grey[400],
-                          inactiveThumbColor: Colors.grey[300],
+                  // Truncated appliance name with tooltip
+                  MouseRegion(
+                    onEnter: (_) => setState(() {}),
+                    onExit: (_) => setState(() {}),
+                    child: Tooltip(
+                      message: appliance.name,
+                      preferBelow: false,
+                      child: Text(
+                        appliance.name.length > maxNameLength
+                            ? '${appliance.name.substring(0, maxNameLength)}...'
+                            : appliance.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                    ],
+                    ),
+                  ),
+                  Text(
+                    'Serial: ${appliance.serialNumber}',
+                    style: const TextStyle(fontSize: 10),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 18),
-                        onPressed: () {},
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete,
-                            color: Colors.red, size: 18),
-                        onPressed: () =>
-                            _showDeleteConfirmationDialog(appliance),
-                      ),
-                    ],
+                  SizedBox(
+                    width: 80,
+                    child: Consumer<ApplianceProvider>(
+                      builder: (context, provider, child) {
+                        // Find the appliance in the provider
+                        Appliance currentAppliance =
+                            provider.appliances.firstWhere(
+                          (a) => a.serialNumber == appliance.serialNumber,
+                          orElse: () =>
+                              appliance, // Return the original appliance if not found
+                        );
+                        return Text(
+                          '${currentAppliance.runtimehr}h ${currentAppliance.runtimemin}m ${currentAppliance.runtimesec}s',
+                          style: const TextStyle(fontSize: 11),
+                        );
+                      },
+                    ),
+                  ),
+                  Text(
+                    appliance.isApplianceOn ? 'Device On' : 'Device Off',
+                    style: TextStyle(
+                      color: appliance.isApplianceOn
+                          ? Colors.green[700]
+                          : Colors.red,
+                      fontWeight: FontWeight.normal,
+                      fontSize: 10,
+                    ),
                   ),
                 ],
               ),
             ],
-          );
-        },
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                children: [
+                  Transform.scale(
+                    scale: 0.75,
+                    child: Switch(
+                      value: appliance.isApplianceOn,
+                      onChanged: (value) async {
+                        await applianceProvider.toggleAppliance(
+                            appliance, value);
+                      },
+                      activeTrackColor: Colors.green[700],
+                      activeColor: Colors.green[900],
+                      inactiveTrackColor: Colors.grey[400],
+                      inactiveThumbColor: Colors.grey[300],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    onPressed: () => _showEditDialog(appliance, index),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                    onPressed: () => _showDeleteConfirmationDialog(appliance),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -224,81 +222,94 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: MediaQuery.of(context).size.width * 0.75,
-            padding: EdgeInsets.all(8.0),
-            margin: EdgeInsets.only(top: 20.0),
-            decoration: BoxDecoration(
-              color: Color.fromARGB(255, 243, 250, 244),
-              border: Border.all(color: Colors.grey[300]!, width: 1.0),
-              borderRadius: BorderRadius.circular(6.0),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Center(
-                  child: Text(
-                    _serverTimestamp != null
-                        ? DateFormat('MMMM d, yyyy - EEEE')
-                            .format(_serverTimestamp!.toDate())
-                        : 'Loading date...',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: const Color.fromARGB(255, 54, 83, 56)),
+        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: MediaQuery.of(context).size.width * 0.75,
+          padding: EdgeInsets.all(8.0),
+          margin: EdgeInsets.only(top: 20.0),
+          decoration: BoxDecoration(
+            color: Color.fromARGB(255, 243, 250, 244),
+            border: Border.all(color: Colors.grey[300]!, width: 1.0),
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Center(
+                child: Text(
+                  _serverDate != null
+                      ? DateFormat('MMMM d, yyyy - EEEE')
+                          .format(_serverDate!) // Format the DateTime directly
+                      : 'Loading date...',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: const Color.fromARGB(255, 54, 83, 56)),
+                ),
+              ),
+              SizedBox(height: 6),
+              FutureBuilder(
+                future: _serverDateFuture, // Use the initialized future
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return CircularProgressIndicator(); // Show loader while fetching
+                  } else if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}'); // Handle error
+                  } else {
+                    return Consumer<ApplianceProvider>(
+                      builder: (context, applianceProvider, child) {
+                        return Column(
+                          children: applianceProvider.appliances
+                              .asMap()
+                              .entries
+                              .map((entry) =>
+                                  _buildApplianceRow(entry.value, entry.key))
+                              .toList(),
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SetupApplianceScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 54, 83, 56),
+                  foregroundColor: const Color(0xFFe8f5e9),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.normal,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6.0),
                   ),
                 ),
-                SizedBox(height: 6),
-                Consumer<ApplianceProvider>(
-                  // Use Consumer to rebuild when appliance state changes
-                  builder: (context, applianceProvider, child) {
-                    return Column(
-                      children: applianceProvider.appliances
-                          .map(_buildApplianceRow)
-                          .toList(),
-                    );
-                  },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 16),
+                    SizedBox(width: 6),
+                    Text('Add Appliance'),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SetupApplianceScreen(),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 54, 83, 56),
-              foregroundColor: const Color(0xFFe8f5e9),
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.normal,
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6.0),
-              ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add, size: 16),
-                SizedBox(width: 6),
-                Text('Add Appliance'),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
-    );
+        ),
+      ],
+    ));
   }
 
   Future<void> _showDeleteConfirmationDialog(Appliance appliance) async {
@@ -421,6 +432,109 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
 
                 Navigator.of(context).pop();
               },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showEditDialog(Appliance appliance, int index) async {
+    _editNameController.text = appliance.name;
+    _selectedEditIcon = appliance.icon;
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Edit Appliance',
+            style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _editNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Appliance Name',
+                    labelStyle: TextStyle(
+                      color: Color.fromARGB(255, 54, 83, 56),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Color.fromARGB(255, 54, 83, 56),
+                      ),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Color.fromARGB(255, 54, 83, 56),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                StatefulBuilder(
+                  // Wrap DropdownButton in StatefulBuilder
+                  builder: (context, setState) {
+                    return Row(
+                      // Use a Row to display the icon and dropdown
+                      children: [
+                        Expanded(
+                          // Expand the dropdown to fill the remaining space
+                          child: DropdownButton<IconData>(
+                            value: _selectedEditIcon,
+                            // Remove the hint text
+                            icon: const Icon(
+                              Icons.arrow_drop_down,
+                              color: Color.fromARGB(255, 54, 83, 56),
+                            ),
+                            onChanged: (IconData? newValue) {
+                              setState(() {
+                                // Call setState of StatefulBuilder
+                                _selectedEditIcon = newValue;
+                              });
+                            },
+                            items: applianceIcons.entries.map((entry) {
+                              return DropdownMenuItem(
+                                value: entry.value,
+                                child: Icon(entry.value),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                final applianceProvider =
+                    Provider.of<ApplianceProvider>(context, listen: false);
+                await applianceProvider.editAppliance(
+                  appliance,
+                  _editNameController.text,
+                  _selectedEditIcon!,
+                  applianceIcons,
+                );
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Save',
+                style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
+              ),
             ),
           ],
         );

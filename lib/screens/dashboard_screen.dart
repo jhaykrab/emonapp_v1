@@ -11,6 +11,7 @@ import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
 import 'package:Emon/screens/history_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:Emon/models/appliance.dart'; // Import the Appliance class
+import 'package:Emon/constants.dart';
 
 import 'dart:async';
 
@@ -26,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTabIndex = 0;
   int _selectedNavbarIndex = 2;
   final _pageController = PageController();
+  bool _isLoading = true;
 
   List<Appliance> _appliances = [];
 
@@ -59,7 +61,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _user = FirebaseAuth.instance.currentUser;
     _fetchUserData();
     _listenToSensorReadings();
-    _fetchApplianceData();
+    _fetchApplianceData().then((_) {
+      setState(() {
+        _isLoading = false; // Data loaded, hide the loader
+      });
+    });
   }
 
   // In dashboard_screen.dart
@@ -102,9 +108,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         setState(() {
           _appliances = snapshot.docs.map((doc) {
+            _isLoading = false;
             Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            String dbPath =
+                _getDbPathForSerialNumber(data['deviceSerialNumber']);
             return Appliance(
-              name: data['applianceName'] ?? '', // Use 'applianceName'
+              name: data['applianceName'] ?? '',
               icon:
                   applianceIcons[data['applianceType']] ?? Icons.device_unknown,
               energy: (data['energy'] ?? 0.0).toDouble(),
@@ -132,12 +141,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // Handle errors, e.g., show an error message
                 }
               },
+              dbPath: dbPath,
             );
           }).toList();
         });
       } catch (e) {
         print('Error fetching appliance data: $e');
       }
+    }
+  }
+
+  // Add this function if it doesn't exist in your DashboardScreen
+  String _getDbPathForSerialNumber(String serialNumber) {
+    switch (serialNumber) {
+      case '11032401':
+        return 'SensorReadings';
+      case '11032402':
+        return 'SensorReadings_2';
+      case '11032403':
+        return 'SensorReadings_3';
+      default:
+        return '';
     }
   }
 
@@ -187,173 +211,181 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBarWidget(userName: _userName),
-      body: Container(
-        color: Colors.white,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              SizedBox(height: 25.0),
-              // Title: Consumption
-              Container(
-                padding: EdgeInsets.symmetric(
-                    vertical: 6.0,
-                    horizontal: 14.0), // Adjust padding if needed
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: const Color.fromARGB(255, 96, 167, 87),
-                    width: 1.5,
-                  ),
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize
-                      .min, // This line makes the Row fit its content
-                  mainAxisAlignment:
-                      MainAxisAlignment.center, // This line centers the Row
+      body: _isLoading // Show loader while loading
+          ? Center(
+              child: CircularProgressIndicator(
+                  color: Color.fromARGB(255, 54, 83, 56)),
+            )
+          : Container(
+              color: Colors.white,
+              child: SingleChildScrollView(
+                child: Column(
                   children: [
-                    Icon(
-                      Icons.bolt,
-                      color: const Color.fromARGB(255, 216, 201, 69),
-                    ),
-                    SizedBox(width: 8.0),
-                    Text(
-                      _selectedTabIndex == 0
-                          ? "Realtime Consumption"
-                          : _selectedTabIndex == 1
-                              ? "Daily Consumption"
-                              : _selectedTabIndex == 2
-                                  ? "Weekly Consumption"
-                                  : "Monthly Consumption",
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: const Color.fromARGB(255, 96, 167, 87),
+                    SizedBox(height: 25.0),
+                    // Title: Consumption
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                          vertical: 6.0,
+                          horizontal: 14.0), // Adjust padding if needed
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: const Color.fromARGB(255, 96, 167, 87),
+                          width: 1.5,
+                        ),
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize
+                            .min, // This line makes the Row fit its content
+                        mainAxisAlignment: MainAxisAlignment
+                            .center, // This line centers the Row
+                        children: [
+                          Icon(
+                            Icons.bolt,
+                            color: const Color.fromARGB(255, 216, 201, 69),
+                          ),
+                          SizedBox(width: 8.0),
+                          Text(
+                            _selectedTabIndex == 0
+                                ? "Realtime Consumption"
+                                : _selectedTabIndex == 1
+                                    ? "Daily Consumption"
+                                    : _selectedTabIndex == 2
+                                        ? "Weekly Consumption"
+                                        : "Monthly Consumption",
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromARGB(255, 96, 167, 87),
+                            ),
+                          ),
+                          SizedBox(width: 12.0),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 12.0),
-                  ],
-                ),
-              ),
-              SizedBox(height: 50),
+                    SizedBox(height: 50),
 
-              // Conditionally render gauge
-              if (_selectedTabIndex == 0)
-                Center(
-                  child: GaugeWidget(value: _energy),
-                ),
-              SizedBox(height: 20),
+                    // In your DashboardScreen build method:
+                    if (_selectedTabIndex == 0)
+                      Center(
+                        child: GaugeWidget(
+                            value: _energy), // Pass the _energy value here
+                      ),
 
-              // Time selection buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TimeButtonWidget(
-                    label: 'R-Time',
-                    index: 0,
-                    selectedTabIndex: _selectedTabIndex,
-                    onPressed: () => _onTimeButtonTapped(0),
-                    buttonWidth: 60, // Reduced button width
-                    fontSize: 10, // Reduced font size
-                  ),
-                  SizedBox(width: 8), // Reduced spacing
-                  TimeButtonWidget(
-                    label: 'Daily',
-                    index: 1,
-                    selectedTabIndex: _selectedTabIndex,
-                    onPressed: () => _onTimeButtonTapped(1),
-                    buttonWidth: 60, // Reduced button width
-                    fontSize: 10, // Reduced font size
-                  ),
-                  SizedBox(width: 8), // Reduced spacing
-                  TimeButtonWidget(
-                    label: 'Weekly',
-                    index: 2,
-                    selectedTabIndex: _selectedTabIndex,
-                    onPressed: () => _onTimeButtonTapped(2),
-                    buttonWidth: 60, // Reduced button width
-                    fontSize: 10, // Reduced font size
-                  ),
-                  SizedBox(width: 8), // Reduced spacing
-                  TimeButtonWidget(
-                    label: 'Monthly',
-                    index: 3,
-                    selectedTabIndex: _selectedTabIndex,
-                    onPressed: () => _onTimeButtonTapped(3),
-                    buttonWidth: 60, // Reduced button width
-                    fontSize: 10, // Reduced font size
-                  ),
-                  SizedBox(width: 8), // Reduced spacing
-                ],
-              ),
+                    SizedBox(height: 20),
 
-              SizedBox(height: 30),
-
-              // View History Button
-              ElevatedButton(
-                onPressed: () {
-                  // Navigate to HistoryScreen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => HistoryScreen(),
+                    // Time selection buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TimeButtonWidget(
+                          label: 'R-Time',
+                          index: 0,
+                          selectedTabIndex: _selectedTabIndex,
+                          onPressed: () => _onTimeButtonTapped(0),
+                          buttonWidth: 60, // Reduced button width
+                          fontSize: 10, // Reduced font size
+                        ),
+                        SizedBox(width: 8), // Reduced spacing
+                        TimeButtonWidget(
+                          label: 'Daily',
+                          index: 1,
+                          selectedTabIndex: _selectedTabIndex,
+                          onPressed: () => _onTimeButtonTapped(1),
+                          buttonWidth: 60, // Reduced button width
+                          fontSize: 10, // Reduced font size
+                        ),
+                        SizedBox(width: 8), // Reduced spacing
+                        TimeButtonWidget(
+                          label: 'Weekly',
+                          index: 2,
+                          selectedTabIndex: _selectedTabIndex,
+                          onPressed: () => _onTimeButtonTapped(2),
+                          buttonWidth: 60, // Reduced button width
+                          fontSize: 10, // Reduced font size
+                        ),
+                        SizedBox(width: 8), // Reduced spacing
+                        TimeButtonWidget(
+                          label: 'Monthly',
+                          index: 3,
+                          selectedTabIndex: _selectedTabIndex,
+                          onPressed: () => _onTimeButtonTapped(3),
+                          buttonWidth: 60, // Reduced button width
+                          fontSize: 10, // Reduced font size
+                        ),
+                        SizedBox(width: 8), // Reduced spacing
+                      ],
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 54, 83, 56),
-                  minimumSize: Size(180, 40),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
-                child: Text(
-                  'View History',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.normal,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
 
-              SizedBox(height: 5),
+                    SizedBox(height: 30),
 
-              // Device Information and Toggle Container
-              DeviceInfoWidget(
-                appliances: _appliances,
-                onAddAppliance: _addAppliance,
-              ),
+                    // View History Button
+                    ElevatedButton(
+                      onPressed: () {
+                        // Navigate to HistoryScreen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HistoryScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 54, 83, 56),
+                        minimumSize: Size(180, 40),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                      child: Text(
+                        'View History',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
 
-              SizedBox(height: 20),
+                    SizedBox(height: 5),
 
-              // PageView for swipeable content
-              SizedBox(
-                height: 400,
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                  },
-                  children: [
-                    // R-Time Content (empty, as the gauge is already displayed)
-                    Container(),
-                    // Daily Content
-                    Center(child: Text('This is Daily Page')),
-                    // Weekly Content
-                    Center(child: Text('This is Weekly Page')),
-                    // Monthly Content
-                    Center(child: Text('This is Monthly Page')),
+                    // Device Information and Toggle Container
+                    DeviceInfoWidget(
+                      appliances: _appliances,
+                      onAddAppliance: _addAppliance,
+                    ),
+
+                    SizedBox(height: 20),
+
+                    // PageView for swipeable content
+                    SizedBox(
+                      height: 400,
+                      child: PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _selectedTabIndex = index;
+                          });
+                        },
+                        children: [
+                          // R-Time Content (empty, as the gauge is already displayed)
+                          Container(),
+                          // Daily Content
+                          Center(child: Text('This is Daily Page')),
+                          // Weekly Content
+                          Center(child: Text('This is Weekly Page')),
+                          // Monthly Content
+                          Center(child: Text('This is Monthly Page')),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
       bottomNavigationBar: BottomNavBarWidget(
         selectedIndex: _selectedNavbarIndex,
         onItemTapped: _onItemTapped,

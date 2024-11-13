@@ -34,12 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
 
-  // Google Sign-In instance removed
-  // final GoogleSignIn _googleSignIn = GoogleSignIn(
-  //   clientId:
-  //       '198738001480-nj4l1ctj7mn2grcirng56igs230l7ivj.apps.googleusercontent.com',
-  // );
-
   // Function to handle user login
   Future<void> userLogin() async {
     if (_formKey.currentState!.validate()) {

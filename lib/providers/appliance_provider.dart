@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:Emon/models/appliance.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:Emon/constants.dart';
 
 class ApplianceProvider with ChangeNotifier {
   List<Appliance> _appliances = [];
+  bool _isLoading = true; // Add isLoading property, initialize as true
 
   List<Appliance> get appliances => _appliances;
+  bool get isLoading => _isLoading;
+
+  // Add a setter for isLoading
+  set isLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
 
   void setAppliances(List<Appliance> appliances) {
     _appliances = appliances;
+    _isLoading = false; // Data is loaded, set isLoading to false
     notifyListeners();
   }
 
@@ -20,49 +30,98 @@ class ApplianceProvider with ChangeNotifier {
   }
 
   void listenToRealtimeData() {
-    for (Appliance appliance in _appliances) {
-      String dbPath = _getDbPathForSerialNumber(appliance.serialNumber);
-
-      if (dbPath.isNotEmpty) {
-        // Listen for changes in the Realtime Database
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _appliances.forEach((appliance) {
+        String dbPath = appliance.dbPath;
         FirebaseDatabase.instance.ref(dbPath).onValue.listen((event) {
           if (event.snapshot.value != null) {
-            Map<dynamic, dynamic> data =
-                event.snapshot.value as Map<dynamic, dynamic>;
-
-            // Update the appliance in the provider
+            final data = event.snapshot.value as Map<dynamic, dynamic>;
             int index = _appliances
-                .indexWhere((a) => a.serialNumber == appliance.serialNumber);
+                .indexWhere((a) => a.serialNumber == data['serialNumber']);
             if (index != -1) {
-              _appliances[index] = Appliance(
-                name: appliance.name,
-                icon: appliance.icon,
-                energy: data['energy']?.toDouble() ?? appliance.energy,
-                voltage: data['voltage']?.toDouble() ?? appliance.voltage,
-                current: data['current']?.toDouble() ?? appliance.current,
-                power: data['power']?.toDouble() ?? appliance.power,
-                runtimehr: data['runtimehr']?.toInt() ?? appliance.runtimehr,
-                runtimemin: data['runtimemin']?.toInt() ?? appliance.runtimemin,
-                runtimesec: data['runtimesec']?.toInt() ?? appliance.runtimesec,
-                isApplianceOn:
-                    data['applianceState'] ?? appliance.isApplianceOn,
-                serialNumber: appliance.serialNumber,
-                documentId: appliance.documentId,
-                onToggleChanged: appliance.onToggleChanged,
-                dbPath: dbPath,
+              _appliances[index] = _appliances[index].copyWith(
+                energy: (data['energy'] ?? 0.0).toDouble(),
+                voltage: (data['voltage'] ?? 0.0).toDouble(),
+                current: (data['current'] ?? 0.0).toDouble(),
+                power: (data['power'] ?? 0.0).toDouble(),
+                runtimehr: (data['runtimehr'] ?? 0).toInt(),
+                runtimemin: (data['runtimemin'] ?? 0).toInt(),
+                runtimesec: (data['runtimesec'] ?? 0).toInt(),
+                isApplianceOn: data['applianceState'] ?? false,
               );
-              notifyListeners(); // Notify listeners of the change
+              notifyListeners();
             }
           }
         });
+      });
+
+      _isLoading = false; // Set isLoading to false after fetching data
+      notifyListeners();
+    }
+  }
+
+  Future<void> editAppliance(Appliance appliance, String newName,
+      IconData newIcon, Map<String, IconData> applianceIcons) async {
+    // 1. Update the appliance in the provider
+    int index =
+        _appliances.indexWhere((a) => a.serialNumber == appliance.serialNumber);
+    if (index != -1) {
+      _appliances[index] = Appliance(
+        name: newName,
+        icon: newIcon,
+        energy: appliance.energy,
+        voltage: appliance.voltage,
+        current: appliance.current,
+        power: appliance.power,
+        runtimehr: appliance.runtimehr,
+        runtimemin: appliance.runtimemin,
+        runtimesec: appliance.runtimesec,
+        isApplianceOn: appliance.isApplianceOn,
+        documentId: appliance.documentId,
+        serialNumber: appliance.serialNumber,
+        onToggleChanged: appliance.onToggleChanged,
+        dbPath: appliance.dbPath,
+      );
+      notifyListeners();
+    }
+
+    // 2. Update Firestore
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('User not logged in!');
+        return;
       }
+
+      // Get the appliance type string from the applianceIcons map
+      String newApplianceType = applianceIcons.keys.firstWhere(
+          (key) => applianceIcons[key] == newIcon,
+          orElse: () => 'unknown'); // Default to 'unknown' if not found
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('registered_appliances')
+          .doc(appliance.documentId)
+          .update({
+        'applianceName': newName,
+        'applianceType': newApplianceType, // Update the appliance type
+      });
+    } catch (e) {
+      print('Error updating appliance in Firestore: $e');
+      // Handle errors, e.g., revert the local change and show an error message
     }
   }
 
   Future<void> toggleAppliance(Appliance appliance, bool newValue) async {
     // 1. Update the appliance state in the provider
-    appliance.isApplianceOn = newValue;
-    notifyListeners();
+    int index =
+        _appliances.indexWhere((a) => a.serialNumber == appliance.serialNumber);
+    if (index != -1) {
+      _appliances[index] = _appliances[index].copyWith(isApplianceOn: newValue);
+      notifyListeners();
+    }
 
     // 2. Update Firestore
     try {
@@ -81,8 +140,11 @@ class ApplianceProvider with ChangeNotifier {
     } catch (e) {
       print('Error updating appliance state in Firestore: $e');
       // Handle errors, e.g., revert the local change and show an error message
-      appliance.isApplianceOn = !newValue;
-      notifyListeners();
+      if (index != -1) {
+        _appliances[index] =
+            _appliances[index].copyWith(isApplianceOn: !newValue);
+        notifyListeners();
+      }
     }
 
     // 3. Update Realtime Database
@@ -97,8 +159,11 @@ class ApplianceProvider with ChangeNotifier {
     } catch (e) {
       print('Error updating appliance state in Realtime Database: $e');
       // Handle errors, e.g., revert the local change and show an error message
-      appliance.isApplianceOn = !newValue;
-      notifyListeners();
+      if (index != -1) {
+        _appliances[index] =
+            _appliances[index].copyWith(isApplianceOn: !newValue);
+        notifyListeners();
+      }
     }
   }
 
