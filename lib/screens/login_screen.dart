@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Emon/screens/dashboard_screen.dart';
+import 'package:Emon/screens/appliance_list.dart';
 import 'package:Emon/screens/signup_screen.dart';
-import 'package:Emon/screens/recovery_screen.dart'; // Import your recovery screen
+import 'package:Emon/screens/recovery_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Emon/screens/SplashScreen.dart';
-import 'package:Emon/services/database.dart'; // Import your DatabaseService
-import 'package:Emon/models/user_data.dart'; // Import your UserData model
-// import 'package:google_sign_in/google_sign_in.dart'; // Removed
+import 'package:Emon/services/database.dart';
+import 'package:Emon/models/user_data.dart';
 
 class LoginScreen extends StatefulWidget {
   static const String routeName = '/login';
@@ -21,18 +21,48 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _firstName = "User"; // Default placeholder
-  String email = "", password = "";
+  String _firstName = "User";
+  String email = ""; // Initialize
+  String password = ""; // Initialize
+  bool _isLoginButtonEnabled = true;
+  int _loginAttempts = 0;
+  Timer? _timer;
 
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
-  bool _obscureText = true; // To control password visibility
+  bool _obscureText = true;
 
-  // Add focus nodes for the text fields
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    emailController.dispose(); // Dispose controllers
+    passwordController.dispose(); // Dispose controllers
+    _emailFocusNode.dispose(); // Dispose focus nodes
+    _passwordFocusNode.dispose(); // Dispose focus nodes
+    super.dispose();
+  }
+
+  void _startLoginCooldown() {
+    setState(() {
+      _isLoginButtonEnabled = false;
+      _loginAttempts++;
+    });
+
+    _timer = Timer(const Duration(seconds: 30), () {
+      if (mounted) {
+        // Ensure widget is still mounted before calling setState
+        setState(() {
+          _isLoginButtonEnabled = true;
+          _loginAttempts = 0;
+        });
+      }
+    });
+  }
 
   // Function to handle user login
   Future<void> userLogin() async {
@@ -58,213 +88,105 @@ class _LoginScreenState extends State<LoginScreen> {
           _firstName = userDoc.get('user_data')['firstName'] ?? "User";
         }
 
-        // Show success SnackBar with the user's first name and checkmark icon
+        // Show success SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green),
+                const Icon(Icons.check_circle_rounded,
+                    color: const Color.fromARGB(
+                        255, 54, 83, 56)), // Rounded check icon
                 const SizedBox(width: 8),
                 RichText(
+                  // RichText for styled text
                   text: TextSpan(
                     text: 'Welcome back ',
                     style: const TextStyle(
-                      color: Color.fromARGB(255, 54, 83, 56),
-                      fontSize: 14.0, // Reduced font size
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: const Color.fromARGB(
+                            255, 54, 83, 56), // Darker green
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.bold),
                     children: <TextSpan>[
                       TextSpan(
                         text: ' $_firstName!',
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16.0, // Reduced font size
-                          color: Color.fromARGB(255, 54, 83, 56),
-                        ),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16.0,
+                            color: const Color.fromARGB(
+                                255, 54, 83, 56)), // Darker green
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            backgroundColor: const Color.fromARGB(255, 193, 223, 194),
+            backgroundColor:
+                const Color.fromARGB(255, 211, 243, 213), // Darker green
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(
-              top: 0.0,
-            ),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0)),
+            margin:
+                const EdgeInsets.only(bottom: 20.0, left: 15.0, right: 15.0),
           ),
         );
-
         // Navigate to DashboardScreen after a short delay
         await Future.delayed(
             const Duration(milliseconds: 500)); // Adjust delay as needed
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(builder: (context) => const ApplianceListScreen()),
         );
       } on FirebaseAuthException catch (e) {
         // Handle Firebase Authentication errors
-        switch (e.code) {
-          case 'invalid-email':
-            // Show error using SnackBar with 'x' icon
+        String errorMessage = 'An error occurred.'; // Generic error message
+
+        if (mounted) {
+          // Ensure widget is still mounted
+          setState(() {
+            switch (e.code) {
+              case 'invalid-email':
+                errorMessage = 'The email you provided is invalid.';
+                break;
+              case 'user-not-found':
+                errorMessage = 'No user found for that email.';
+                break;
+              case 'wrong-password':
+                errorMessage = 'Wrong password provided.';
+                break;
+              case 'user-disabled':
+                errorMessage = 'This user has been disabled.';
+                break;
+              case 'too-many-requests':
+                errorMessage = 'Too many requests. Try again later.';
+                break;
+              default: // Handle any other FirebaseAuthException
+                errorMessage = 'Login failed. Check your credentials.';
+                break;
+            }
+
+            // Show error SnackBar inside setState
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
+              SnackBar(
                 content: Row(
                   children: [
-                    Icon(Icons.close_rounded,
-                        color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'The email you provided is invalid. Please enter a new email.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
+                    const Icon(Icons.error_outline_rounded,
+                        color: Color.fromARGB(255, 110, 36, 36)),
+                    const SizedBox(width: 8),
+                    Text(errorMessage,
+                        style: const TextStyle(
+                            color: Color.fromARGB(255, 110, 36, 36))),
                   ],
                 ),
+                backgroundColor:
+                    const Color.fromARGB(255, 243, 208, 206), // Lighter red
                 behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0)),
+                margin: const EdgeInsets.only(
+                    bottom: 20.0, left: 15.0, right: 15.0),
               ),
             );
-            break;
-          case 'user-not-found':
-            // Show error using SnackBar with 'x' icon
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
-                content: Row(
-                  children: [
-                    Icon(Icons.close_rounded,
-                        color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'No user found for that email.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
-                  ],
-                ),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
-              ),
-            );
-            break;
-          case 'wrong-password':
-            // Show error using SnackBar
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
-                content: Row(
-                  children: [
-                    Icon(Icons.close_rounded,
-                        color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Wrong password provided for that user.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
-                  ],
-                ),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
-              ),
-            );
-            break;
-          case 'user-disabled':
-            // Show error using SnackBar
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
-                content: Row(
-                  children: [
-                    Icon(Icons.close, color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'This user has been disabled.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
-                  ],
-                ),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
-              ),
-            );
-            break;
-          case 'too-many-requests':
-            // Show error using SnackBar
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
-                content: Row(
-                  children: [
-                    Icon(Icons.close_rounded,
-                        color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Too many requests. Please try again later.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
-                  ],
-                ),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
-              ),
-            );
-            break;
-          default:
-            // Show a generic error message for other Firebase errors
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color.fromARGB(255, 238, 168, 168),
-                content: Row(
-                  children: [
-                    Icon(Icons.close_rounded,
-                        color: Color.fromARGB(255, 63, 19, 16)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Failed to login. Please check your credentials.',
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 63, 19, 16),
-                      ),
-                    ),
-                  ],
-                ),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  top: 0.0,
-                ),
-              ),
-            );
+          });
         }
       } catch (e) {
         // Handle other errors
@@ -278,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Color.fromARGB(255, 63, 19, 16)),
                 SizedBox(width: 8),
                 Text(
-                  'Failed to login. Please try again.',
+                  'Failed to login. Please check your credentials.',
                   style: TextStyle(
                     fontSize: 14.0,
                     fontWeight: FontWeight.bold,
@@ -590,7 +512,7 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(seconds: 1));
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      MaterialPageRoute(builder: (context) => const ApplianceListScreen()),
     );
   }
 }

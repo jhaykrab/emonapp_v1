@@ -1,4 +1,3 @@
-import 'package:Emon/services/global_state.dart';
 import 'package:flutter/material.dart';
 import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:Emon/screens/SplashScreenLogo.dart';
@@ -10,20 +9,21 @@ import 'package:Emon/admin/admin_page_screen.dart';
 import 'package:Emon/admin/admin_login_screen.dart';
 import 'firebase_options.dart';
 import 'package:provider/provider.dart';
-import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
-import 'package:Emon/screens/appliance_list.dart';
+import 'package:Emon/services/global_state.dart';
+import 'package:Emon/providers/appliance_provider.dart';
+import 'package:Emon/screens/appliance_list.dart'; // Import!
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(
     MultiProvider(
-      // Use MultiProvider for multiple providers
       providers: [
-        ChangeNotifierProvider(create: (context) => ApplianceProvider()),
         ChangeNotifierProvider(create: (context) => GlobalState()),
+        ChangeNotifierProvider(create: (context) => ApplianceProvider()),
       ],
       child: const MyApp(),
     ),
@@ -44,11 +44,14 @@ class MyApp extends StatelessWidget {
       routes: {
         SplashScreenLogo.routeName: (context) => const SplashScreenLogo(),
         SplashScreen.routeName: (context) => const SplashScreen(),
-        SetupApplianceScreen.routeName: (context) => SetupApplianceScreen(),
-        '/login-screen': (context) => const LoginScreen(),
+        SetupApplianceScreen.routeName: (context) =>
+            const SetupApplianceScreen(),
+        ApplianceListScreen.routeName: (context) =>
+            const ApplianceListScreen(), // Added route for ApplianceListScreen
+        '/login-screen': (context) =>
+            const LoginScreen(), // Keep this if you use it elsewhere
         LoginScreenAdmin.routeName: (context) => const LoginScreenAdmin(),
         AdminPage.routeName: (context) => const AdminPage(),
-        ApplianceListScreen.routeName: (context) => const ApplianceListScreen(),
         DashboardScreen.routeName: (context) => const DashboardScreen(),
       },
     );

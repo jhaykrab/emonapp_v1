@@ -9,9 +9,9 @@ import 'package:Emon/models/user_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Emon/screens/setup_appliance_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:Emon/providers/appliance_provider.dart'; // Import your appliance provider
+import 'package:Emon/providers/appliance_provider.dart';
 import 'package:Emon/models/appliance.dart';
-import 'package:Emon/constants.dart'; // Import your constants file
+import 'package:Emon/constants.dart';
 
 class ApplianceListScreen extends StatefulWidget {
   static const String routeName = '/applianceList';
@@ -69,21 +69,18 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
   }
 
   Future<void> _fetchApplianceData() async {
-    setState(() {
-      _isLoading = true; // Set loading flag to true before fetching data
-    });
+    setState(() => _isLoading = true);
 
     if (_user != null) {
       try {
         _appliances = await _dbService.getApplianceData(_user!.uid);
 
-        // Initialize the ApplianceProvider with fetched data
         Provider.of<ApplianceProvider>(context, listen: false)
             .setAppliances(_appliances.map((applianceData) {
           return Appliance(
             name: applianceData['applianceName'] ?? '',
-            icon: applianceIcons[applianceData['applianceType']] ??
-                Icons.device_unknown,
+            applianceType: applianceData['applianceType'] ??
+                'unknown', // This is enough now
             energy: (applianceData['energy'] ?? 0.0).toDouble(),
             voltage: (applianceData['voltage'] ?? 0.0).toDouble(),
             current: (applianceData['current'] ?? 0.0).toDouble(),
@@ -94,21 +91,15 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
             isApplianceOn: applianceData['isOn'] ?? false,
             documentId: applianceData['docId'] ?? '',
             serialNumber: applianceData['deviceSerialNumber'] ?? '',
-            onToggleChanged: (value) {}, // You can leave this empty for now
+            onToggleChanged: (value) {},
             dbPath: _getDbPath(applianceData['deviceSerialNumber'] ?? ''),
           );
         }).toList());
       } catch (e) {
         print('Error fetching appliance data: $e');
-        _appliances = []; // Set to empty list on error
-        // You can also show an error message to the user here
+        _appliances = [];
       } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading =
-                false; // Set loading flag to false after fetching data or handling errors
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -245,7 +236,10 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
 
   Future<void> _showEditDialog(Appliance appliance, int index) async {
     _editNameController.text = appliance.name;
-    _selectedEditIcon = appliance.icon;
+    String? selectedApplianceType =
+        appliance.applianceType; // Get the appliance type STRING
+    _selectedEditIcon = applianceIcons[
+        selectedApplianceType]; // Set selected icon based on string
 
     await showDialog(
       context: context,
@@ -280,30 +274,31 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                 ),
                 const SizedBox(height: 16),
                 StatefulBuilder(
-                  // Wrap DropdownButton in StatefulBuilder
                   builder: (context, setState) {
                     return Row(
-                      // Use a Row to display the icon and dropdown
                       children: [
                         Expanded(
-                          // Expand the dropdown to fill the remaining space
-                          child: DropdownButton<IconData>(
-                            value: _selectedEditIcon,
-                            // Remove the hint text
-                            icon: const Icon(
-                              Icons.arrow_drop_down,
-                              color: Color.fromARGB(255, 54, 83, 56),
-                            ),
-                            onChanged: (IconData? newValue) {
+                          child: DropdownButton<String>(
+                            // Dropdown for appliance type STRING
+                            value: selectedApplianceType,
+                            icon: const Icon(Icons.arrow_drop_down),
+                            onChanged: (String? newValue) {
                               setState(() {
-                                // Call setState of StatefulBuilder
-                                _selectedEditIcon = newValue;
+                                selectedApplianceType = newValue;
+                                _selectedEditIcon =
+                                    applianceIcons[newValue]; // Update the icon
                               });
                             },
                             items: applianceIcons.entries.map((entry) {
-                              return DropdownMenuItem(
-                                value: entry.value,
-                                child: Icon(entry.value),
+                              return DropdownMenuItem<String>(
+                                value: entry.key, // The appliance type STRING
+                                child: Row(
+                                  children: [
+                                    Icon(entry.value), // The icon
+                                    const SizedBox(width: 8),
+                                    Text(entry.key), // The appliance type name
+                                  ],
+                                ),
                               );
                             }).toList(),
                           ),
@@ -350,7 +345,6 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
       appliance,
       _editNameController.text,
       _selectedEditIcon!,
-      applianceIcons,
     );
 
     // Clear the controllers
@@ -358,125 +352,116 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
     _selectedEditIcon = null;
   }
 
-  // Function to show a confirmation dialog before removing an appliance
   Future<void> _showRemoveConfirmationDialog(Appliance appliance) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // user must tap button!
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text(
-            'Remove Appliance',
-            style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
-          ),
+          title: const Text('Remove Appliance',
+              style: TextStyle(color: Color.fromARGB(255, 54, 83, 56))),
           content: const SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text(
-                  'Are you sure you want to remove this appliance?',
-                  style: TextStyle(color: Color.fromARGB(255, 22, 22, 22)),
-                ),
+                Text('Are you sure you want to remove this appliance?',
+                    style: TextStyle(color: Color.fromARGB(255, 22, 22, 22))),
               ],
             ),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color.fromARGB(255, 54, 83, 56)),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              child: const Text('Cancel',
+                  style: TextStyle(color: Color.fromARGB(255, 54, 83, 56))),
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text(
-                'Remove',
-                style: TextStyle(color: Color.fromARGB(255, 114, 18, 18)),
-              ),
+              child: const Text('Remove',
+                  style: TextStyle(color: Color.fromARGB(255, 114, 18, 18))),
               onPressed: () async {
-                final applianceDocId = appliance.documentId;
-                final applianceSerialNumber = appliance.serialNumber;
                 final applianceProvider =
                     Provider.of<ApplianceProvider>(context, listen: false);
 
                 try {
-                  // Remove appliance data from Firestore
                   await FirebaseFirestore.instance
                       .collection('users')
                       .doc(FirebaseAuth.instance.currentUser!.uid)
                       .collection('registered_appliances')
-                      .doc(applianceDocId)
+                      .doc(appliance.documentId)
                       .delete();
 
-                  // --- Remove UID from Realtime Database ---
-                  final DatabaseReference dbRef = FirebaseDatabase.instance
-                      .ref(); // Declare dbRef only once
-                  List<String> paths = [
+                  final dbRef = FirebaseDatabase.instance.ref();
+                  final paths = [
                     'SensorReadings',
                     'SensorReadings_2',
-                    'SensorReadings_3',
+                    'SensorReadings_3'
                   ];
 
-                  for (String path in paths) {
-                    final DataSnapshot snapshot =
+                  for (final path in paths) {
+                    final snapshot =
                         await dbRef.child('$path/serialNumber').get();
-
                     if (snapshot.value != null &&
-                        snapshot.value.toString() == applianceSerialNumber) {
-                      // Found matching serial number, remove UID field
+                        snapshot.value.toString() == appliance.serialNumber) {
                       await dbRef.child('$path/uid').remove();
-                      print(
-                          'UID field removed from Realtime Database path: $path');
-                      break; // Stop searching after finding a match
+                      print('UID removed from $path');
+                      break;
                     }
                   }
 
-                  // Update the _appliances list in the provider
+                  // Remove from UI immediately
                   applianceProvider.removeAppliance(appliance);
 
-                  // Show success message
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green),
+                        // Row for icon and text
+                        children: const [
+                          Icon(Icons.check_circle,
+                              color: const Color.fromARGB(255, 54, 83, 56)),
                           SizedBox(width: 8),
                           Text(
                             'Appliance removed successfully!',
                             style: TextStyle(
-                              color: Color.fromARGB(
-                                  255, 54, 83, 56), // Dark green text
-                            ),
+                                color: const Color.fromARGB(
+                                    255, 54, 83, 56)), // White text
                           ),
                         ],
                       ),
-                      backgroundColor: Color.fromARGB(
-                          255, 193, 223, 194), // Light green background
+                      backgroundColor: const Color.fromARGB(255, 211, 243, 213),
+                      behavior: SnackBarBehavior.floating, // Floating behavior
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(10.0), // Rounded corners
+                      ),
+                      margin: const EdgeInsets.only(
+                          bottom: 20.0, left: 15.0, right: 15.0), // Margins
+                      duration: const Duration(seconds: 2), //Optional duration
                     ),
                   );
                 } catch (e) {
-                  // Handle errors
-                  print('Error removing appliance: $e');
+                  print('Error removing: $e');
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Row(
-                        children: [
-                          Icon(Icons.error, color: Colors.red), // Error icon
+                        children: const [
+                          Icon(Icons.error,
+                              color: Color.fromARGB(
+                                  255, 110, 36, 36)), // White icon
                           SizedBox(width: 8),
-                          Text(
-                            'Failed to remove appliance.',
-                            style: TextStyle(
-                              color: Colors.white, // White text
-                            ),
-                          ),
+                          Text('Failed to remove appliance.',
+                              style: TextStyle(
+                                  color: Color.fromARGB(255, 110, 36, 36))),
                         ],
                       ),
-                      backgroundColor: Colors.red, // Red background
+                      backgroundColor: const Color.fromARGB(
+                          255, 243, 208, 206), // Lighter red
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      margin: const EdgeInsets.only(
+                          bottom: 20, left: 15, right: 15),
                     ),
                   );
                 }
-
                 Navigator.of(context).pop();
               },
             ),

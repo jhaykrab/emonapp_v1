@@ -112,10 +112,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
             String dbPath =
                 _getDbPathForSerialNumber(data['deviceSerialNumber']);
+
             return Appliance(
               name: data['applianceName'] ?? '',
-              icon:
-                  applianceIcons[data['applianceType']] ?? Icons.device_unknown,
+              applianceType:
+                  data['applianceType'] ?? 'unknown', // Corrected line
               energy: (data['energy'] ?? 0.0).toDouble(),
               voltage: (data['voltage'] ?? 0.0).toDouble(),
               current: (data['current'] ?? 0.0).toDouble(),
@@ -125,22 +126,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runtimesec: (data['runtimesec'] ?? 0).toInt(),
               isApplianceOn: data['isOn'] ?? false,
               documentId: doc.id,
-              serialNumber:
-                  data['deviceSerialNumber'] ?? '', // Fetch serial number
-              onToggleChanged: (value) async {
-                // Implement toggle logic for each appliance in Firestore
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .collection('registered_appliances')
-                      .doc(doc.id)
-                      .update({'isOn': value});
-                } catch (e) {
-                  print('Error updating appliance state: $e');
-                  // Handle errors, e.g., show an error message
-                }
-              },
+              serialNumber: data['deviceSerialNumber'] ?? '',
+              onToggleChanged: (value) async {/* ... */},
               dbPath: dbPath,
             );
           }).toList();
@@ -269,8 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // In your DashboardScreen build method:
                     if (_selectedTabIndex == 0)
                       Center(
-                        child: GaugeWidget(
-                            value: _energy), // Pass the _energy value here
+                        child: GaugeWidget(), // Pass the _energy value here
                       ),
 
                     SizedBox(height: 20),

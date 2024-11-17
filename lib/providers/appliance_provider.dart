@@ -61,15 +61,18 @@ class ApplianceProvider with ChangeNotifier {
     }
   }
 
-  Future<void> editAppliance(Appliance appliance, String newName,
-      IconData newIcon, Map<String, IconData> applianceIcons) async {
-    // 1. Update the appliance in the provider
+  Future<void> editAppliance(
+      Appliance appliance, String newName, IconData newIcon) async {
+    String newApplianceType = applianceIcons.keys.firstWhere(
+        (k) => applianceIcons[k] == newIcon,
+        orElse: () => 'unknown');
+
     int index =
         _appliances.indexWhere((a) => a.serialNumber == appliance.serialNumber);
     if (index != -1) {
-      _appliances[index] = Appliance(
+      _appliances[index] = _appliances[index].copyWith(
         name: newName,
-        icon: newIcon,
+        applianceType: newApplianceType,
         energy: appliance.energy,
         voltage: appliance.voltage,
         current: appliance.current,
@@ -93,11 +96,6 @@ class ApplianceProvider with ChangeNotifier {
         print('User not logged in!');
         return;
       }
-
-      // Get the appliance type string from the applianceIcons map
-      String newApplianceType = applianceIcons.keys.firstWhere(
-          (key) => applianceIcons[key] == newIcon,
-          orElse: () => 'unknown'); // Default to 'unknown' if not found
 
       await FirebaseFirestore.instance
           .collection('users')

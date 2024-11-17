@@ -1,9 +1,12 @@
 // appliance.dart
 import 'package:flutter/material.dart';
+import 'package:Emon/constants.dart'; // Import your constants file
 
 class Appliance {
   String name;
-  IconData icon;
+  String applianceType;
+  // Make 'icon' a getter
+  IconData get icon => applianceIcons[applianceType] ?? Icons.device_unknown;
   double energy;
   double voltage;
   double current;
@@ -19,7 +22,7 @@ class Appliance {
 
   Appliance({
     required this.name,
-    required this.icon,
+    required this.applianceType,
     required this.energy,
     required this.voltage,
     required this.current,
@@ -34,10 +37,9 @@ class Appliance {
     required this.dbPath,
   });
 
-  // Add the copyWith method
   Appliance copyWith({
     String? name,
-    IconData? icon,
+    String? applianceType, // Include applianceType in copyWith
     double? energy,
     double? voltage,
     double? current,
@@ -53,7 +55,7 @@ class Appliance {
   }) {
     return Appliance(
       name: name ?? this.name,
-      icon: icon ?? this.icon,
+      applianceType: applianceType ?? this.applianceType,
       energy: energy ?? this.energy,
       voltage: voltage ?? this.voltage,
       current: current ?? this.current,

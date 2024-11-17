@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:Emon/screens/appliance_list.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:Emon/constants.dart';
 
 class SetupApplianceScreen extends StatefulWidget {
   static const String routeName = '/setupAppliance';
+
+  const SetupApplianceScreen({Key? key})
+      : super(key: key); // Added const constructor
 
   @override
   State<SetupApplianceScreen> createState() => _SetupApplianceScreenState();
@@ -29,9 +33,10 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
   int _deviceCount = 1;
   final List<String> _timeUnits = ['hrs', 'min', 'sec'];
-  String? _selectedTimeUnit;
+  String? _selectedTimeUnit = 'hrs'; // Initialize with a default value
   bool _isSerialNumberValid = false;
-  bool _areFieldsEnabled = false; // Flag to control field enabling
+  bool _isDeviceFound = false;
+  bool _areFieldsEnabled = false;
 
   final FocusNode _applianceNameFocusNode = FocusNode();
   final FocusNode _maxUsageLimitFocusNode = FocusNode();
@@ -49,6 +54,39 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     super.initState();
     _fetchDeviceCount();
     _fetchNextDbPathIndex();
+    _deviceSerialNumberController.addListener(_checkSerialNumber);
+  }
+
+  @override
+  void dispose() {
+    _deviceSerialNumberController.removeListener(_checkSerialNumber);
+    _deviceSerialNumberController.dispose();
+    _applianceNameController.dispose();
+    _maxUsageLimitController.dispose();
+    _applianceNameFocusNode.dispose();
+    _maxUsageLimitFocusNode.dispose();
+    _deviceSerialNumberFocusNode.dispose();
+
+    super.dispose();
+  }
+
+  void _clearFields() {
+    _applianceNameController.clear();
+    _deviceSerialNumberController.clear();
+    _maxUsageLimitController.clear();
+    setState(() {
+      _selectedApplianceIcon = null;
+      _selectedTimeUnit = 'hrs';
+      _isSerialNumberValid = false;
+      _isDeviceFound = false;
+      _areFieldsEnabled = false;
+    });
+  }
+
+  void _checkSerialNumber() {
+    setState(() {
+      _isDeviceFound = false;
+    });
   }
 
   Future<void> _searchSerialNumber() async {
@@ -57,8 +95,9 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     if (serialNumber.isEmpty) return;
 
     final DatabaseReference dbRef = FirebaseDatabase.instance.ref();
-    bool isDeviceAvailable = false;
     bool isDeviceInUse = false;
+    bool deviceFound = false;
+
     try {
       for (String path in _dbPaths) {
         final DataSnapshot snapshot = await dbRef.child(path).get();
@@ -69,9 +108,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
           if (data.containsKey('serialNumber') &&
               data['serialNumber'] == serialNumber) {
-            isDeviceAvailable = true;
-
-            // Check if uid exists for this serial number
+            deviceFound = true;
             if (data.containsKey('uid') && data['uid'] != null) {
               isDeviceInUse = true;
             }
@@ -81,48 +118,83 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
       }
 
       setState(() {
-        _isSerialNumberValid = isDeviceAvailable && !isDeviceInUse;
-        _areFieldsEnabled = _isSerialNumberValid;
+        _isDeviceFound = !isDeviceInUse;
+        _areFieldsEnabled = _isDeviceFound; //Simplified conditional
+        _isSerialNumberValid =
+            deviceFound; // Set to true if a device is found with/without uid
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              if (isDeviceAvailable && !isDeviceInUse) ...[
-                const Icon(Icons.check_circle, color: Colors.green),
-                const SizedBox(width: 8),
-                const Text(
-                  'Device Available!',
-                  style: TextStyle(
-                    color: Colors.green,
-                  ),
-                ),
-              ] else if (isDeviceInUse) ...[
-                const Icon(Icons.cancel, color: Colors.red),
-                const SizedBox(width: 8),
-                const Text(
-                  'Device in use. Please enter a new one.',
-                  style: TextStyle(
-                    color: Colors.red,
-                  ),
-                ),
-              ] else ...[
-                const Icon(Icons.cancel, color: Colors.red),
-                const SizedBox(width: 8),
-                const Text(
-                  'No device for that serial number yet. Please enter a new one.',
-                  style: TextStyle(
-                    color: Colors.red,
-                  ),
-                ),
+      if (!deviceFound && serialNumber.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.error_outline_rounded,
+                    color: Colors.white), // White wrong icon
+                SizedBox(width: 8),
+                Text('No device for that serial number yet!',
+                    style: TextStyle(color: Colors.white)),
               ],
-            ],
+            ),
+            backgroundColor: const Color.fromARGB(
+                255, 255, 105, 97), // Lighter red background
+            behavior: SnackBarBehavior.floating, // Modern snackbar behavior
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0), // Rounded corners
+            ),
+            margin: const EdgeInsets.only(
+                bottom: 20.0,
+                left: 15.0,
+                right: 15.0), // Add margin from the edges
           ),
-          backgroundColor: const Color.fromARGB(255, 243, 250, 244),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      } else if (isDeviceInUse) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.error_outline_rounded,
+                    color: Colors.white), // White wrong icon
+                SizedBox(width: 8),
+                Text('Device already in use!',
+                    style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            backgroundColor: const Color.fromARGB(
+                255, 255, 105, 97), // Lighter red background
+            behavior: SnackBarBehavior.floating, // Modern snackbar behavior
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0), // Rounded corners
+            ),
+            margin: const EdgeInsets.only(
+                bottom: 20.0,
+                left: 15.0,
+                right: 15.0), // Add margin from the edges
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle_rounded,
+                    color: Colors.white), // Filled check icon
+                SizedBox(width: 8),
+                Text('Device Available!',
+                    style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            backgroundColor:
+                const Color.fromARGB(255, 54, 83, 56), // Darker green
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            margin: const EdgeInsets.only(
+                bottom: 20.0, left: 15.0, right: 15.0), // Add margin
+          ),
+        );
+      }
     } catch (e) {
       print('Error searching serial number: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +217,6 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
 
         setState(() {
           _deviceCount = snapshot.docs.length + 1;
-          // Update _nextDbPathIndex based on the current device count
           _nextDbPathIndex = (_deviceCount - 1) % _dbPaths.length;
         });
       } catch (e) {
@@ -173,6 +244,8 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
     }
   }
 
+  String? _selectedApplianceType;
+
   String _getSelectedApplianceType() {
     if (_selectedApplianceIcon == Icons.lightbulb_outline) {
       return 'lightbulb';
@@ -188,14 +261,16 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
   }
 
   Future<void> _saveApplianceData() async {
-    if (_formKey.currentState!.validate() && _isSerialNumberValid) {
+    if (_formKey.currentState!.validate() &&
+        _isSerialNumberValid &&
+        _selectedApplianceType != null) {
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
           String applianceName = _applianceNameController.text;
           String deviceSerialNumber = _deviceSerialNumberController.text;
           int maxUsageLimit = int.parse(_maxUsageLimitController.text);
-          String applianceType = _getSelectedApplianceType();
+          String applianceType = _selectedApplianceType!;
           String dbPath = _dbPaths[_nextDbPathIndex];
 
           // Save the appliance data to Firestore
@@ -234,68 +309,60 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
-                children: [
-                  Icon(Icons.check_circle_outline, color: Colors.green),
+                // Row for icon and text
+                children: const [
+                  Icon(Icons.check_circle,
+                      color: const Color.fromARGB(255, 54, 83, 56)),
                   SizedBox(width: 8),
                   Text(
                     'Appliance saved successfully!',
                     style: TextStyle(
-                      color: Color.fromARGB(255, 54, 83, 56), // Dark green text
-                    ),
+                        color: const Color.fromARGB(
+                            255, 54, 83, 56)), // White text
                   ),
                 ],
               ),
-              backgroundColor: Colors.white, // White background
+              backgroundColor:
+                  const Color.fromARGB(255, 211, 243, 213), // Darker green
+              behavior: SnackBarBehavior.floating, // Floating behavior
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-                side: BorderSide(color: Colors.green), // Green outline
+                borderRadius: BorderRadius.circular(10.0), // Rounded corners
               ),
+              margin: const EdgeInsets.only(
+                  bottom: 20.0, left: 15.0, right: 15.0), // Margins
+              duration: const Duration(seconds: 2), //Optional duration
             ),
           );
-
-          Navigator.pushReplacementNamed(
-              context, ApplianceListScreen.routeName);
+          Navigator.pushNamedAndRemoveUntil(
+              context, ApplianceListScreen.routeName, (route) => false);
         } catch (e) {
           print('Error saving appliance data: $e');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red),
+                children: const [
+                  Icon(Icons.error,
+                      color: Color.fromARGB(255, 110, 36, 36)), // White icon
                   SizedBox(width: 8),
-                  Text(
-                    'Error saving appliance data.',
-                    style: TextStyle(color: Colors.white), // White text
-                  ),
+                  Text('Error saving appliance data.',
+                      style:
+                          TextStyle(color: Color.fromARGB(255, 110, 36, 36))),
                 ],
               ),
-              backgroundColor: Colors.red, // Red background
+              backgroundColor:
+                  const Color.fromARGB(255, 243, 208, 206), // Lighter red
+              behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-                side: BorderSide(color: Colors.red), // Red outline
-              ),
+                  borderRadius: BorderRadius.circular(10)),
+              margin: const EdgeInsets.only(bottom: 20, left: 15, right: 15),
             ),
           );
         }
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.warning_amber_outlined, color: Colors.orange),
-              SizedBox(width: 8),
-              Text(
-                'Please fill in all fields correctly.',
-                style: TextStyle(color: Colors.white), // White text
-              ),
-            ],
-          ),
-          backgroundColor: Colors.orange, // Orange background
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
-            side: BorderSide(color: Colors.orange), // Orange outline
-          ),
+        const SnackBar(
+          content: Text('Please fill in all fields correctly.'),
         ),
       );
     }
@@ -308,7 +375,10 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           color: const Color.fromARGB(255, 72, 100, 68),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pop(context);
+            _clearFields(); // Clear fields when navigating back
+          },
         ),
         title: const Text(
           'Back',
@@ -319,7 +389,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
             color: Color.fromARGB(255, 72, 100, 68),
           ),
         ),
-        backgroundColor: Color.fromARGB(255, 243, 250, 244),
+        backgroundColor: const Color.fromARGB(255, 243, 250, 244),
         elevation: 0,
       ),
       body: Container(
@@ -346,89 +416,96 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                       fontFamily: 'Rubik',
                     ),
                   ),
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 10),
 
+                  // Logo
                   Image.asset(
                     'assets/staticimgs/tech-support-concept-illustration.png',
                     height: 200.0,
                     width: 200.0,
                   ),
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 20),
 
-                  // Device Serial Number Input
+                  // Device Serial Number Input with message and disabling
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 32.0, vertical: 8),
                     child: SizedBox(
                       width: 275,
-                      child: Row(
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _deviceSerialNumberController,
-                              focusNode: _deviceSerialNumberFocusNode,
-                              cursorColor:
-                                  const Color.fromARGB(255, 54, 83, 56),
-                              decoration: InputDecoration(
-                                labelText: 'Device Serial Number',
-                                labelStyle: TextStyle(
-                                  fontSize: 13,
-                                  color: _deviceSerialNumberFocusNode.hasFocus
-                                      ? const Color.fromARGB(255, 54, 83, 56)
-                                      : const Color.fromARGB(255, 6, 17, 8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 8.0, horizontal: 16.0),
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: _isSerialNumberValid
-                                        ? Colors.green
-                                        : Colors.red,
-                                    width: 2.0,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _deviceSerialNumberController,
+                                  focusNode: _deviceSerialNumberFocusNode,
+                                  enabled: !_isDeviceFound,
+                                  cursorColor:
+                                      const Color.fromARGB(255, 54, 83, 56),
+                                  decoration: InputDecoration(
+                                    labelText: 'Device Serial Number',
+                                    labelStyle: TextStyle(
+                                      fontSize: 13,
+                                      color: _deviceSerialNumberFocusNode
+                                              .hasFocus
+                                          ? const Color.fromARGB(
+                                              255, 54, 83, 56)
+                                          : const Color.fromARGB(255, 6, 17, 8),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 8.0, horizontal: 16.0),
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: _isSerialNumberValid
+                                            ? Colors.green
+                                            : Colors.red,
+                                        width: 2.0,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: _isSerialNumberValid
+                                            ? Colors.green
+                                            : Colors.red,
+                                        width: 2.0,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: _isSerialNumberValid
-                                        ? Colors.green
-                                        : Colors.red,
-                                    width: 2.0,
-                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter a device serial number';
+                                    }
+                                    if (value.length < 8 || value.length > 10) {
+                                      return 'Serial number must be 8-10 digits';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter a device serial number';
-                                }
-                                if (value.length < 8 || value.length > 10) {
-                                  return 'Serial number must be 8-10 digits';
-                                }
-                                return null;
-                              },
-                            ),
+                              IconButton(
+                                onPressed:
+                                    _isDeviceFound ? null : _searchSerialNumber,
+                                icon: const Icon(Icons.search,
+                                    color: Color.fromARGB(255, 54, 83, 56)),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  print('Wi-Fi button pressed!');
+                                },
+                                icon: const Icon(Icons.wifi,
+                                    color: Color.fromARGB(255, 54, 83, 56)),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed: _searchSerialNumber,
-                            icon: const Icon(
-                              Icons.search,
-                              color: Color.fromARGB(255, 54, 83, 56),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              // Add your Wi-Fi scanning logic here later
-                              print('Wi-Fi button pressed!');
-                            },
-                            icon: const Icon(
-                              Icons.wifi,
-                              color: Color.fromARGB(255, 54, 83, 56),
-                            ),
-                          ),
+                          if (!_isDeviceFound &&
+                              _deviceSerialNumberController.text.isNotEmpty)
+                            ...[],
                         ],
                       ),
                     ),
@@ -467,19 +544,47 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                                 width: 2.0,
                               ),
                             ),
-                            suffixIcon: DropdownButton<IconData>(
-                              value: _selectedApplianceIcon,
-                              onChanged: (newValue) {
-                                setState(() {
-                                  _selectedApplianceIcon = newValue;
-                                });
-                              },
-                              items: _applianceIcons.map((icon) {
-                                return DropdownMenuItem(
-                                  value: icon,
-                                  child: Icon(icon), // Display Icon widget
-                                );
-                              }).toList(),
+                            suffixIcon: IntrinsicWidth(
+                              // Use IntrinsicWidth for automatic sizing
+                              child: DropdownButton<String>(
+                                value: _selectedApplianceType,
+                                hint: const Text(
+                                  'select icon',
+                                  style: TextStyle(
+                                      fontSize: 14), // Decreased font size
+                                ), // Add a hint
+                                onChanged: (newValue) {
+                                  setState(() {
+                                    _selectedApplianceType = newValue;
+                                  });
+                                },
+                                items: applianceIcons.keys.map((String type) {
+                                  return DropdownMenuItem<String>(
+                                    value: type,
+                                    child: SizedBox(
+                                      // Add SizedBox to DropdownMenuItem
+                                      width: 80, // Adjust width as needed
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(applianceIcons[type]),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            // Wrap text with Flexible
+                                            child: Text(
+                                              type,
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                              overflow: TextOverflow
+                                                  .ellipsis, // Handle overflow
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ),
                           validator: (value) {
@@ -529,7 +634,7 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                               ),
                               suffixIcon: SizedBox(
                                 // Wrap DropdownButtonFormField with SizedBox
-                                width: 60, // Adjust width as needed
+                                width: 55, // Adjust width as needed
                                 child: DropdownButtonFormField<String>(
                                   value: _selectedTimeUnit,
                                   onChanged: (newValue) {
@@ -537,12 +642,16 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                                       _selectedTimeUnit = newValue!;
                                     });
                                   },
-                                  items: _timeUnits
-                                      .map((unit) => DropdownMenuItem(
-                                            value: unit,
-                                            child: Text(unit),
-                                          ))
-                                      .toList(),
+                                  items: _timeUnits.map((String unit) {
+                                    return DropdownMenuItem<String>(
+                                      value: unit,
+                                      child: Text(unit,
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Color.fromARGB(
+                                                  255, 117, 116, 116))),
+                                    );
+                                  }).toList(),
                                 ),
                               ),
                             ),
@@ -563,31 +672,65 @@ class _SetupApplianceScreenState extends State<SetupApplianceScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Save Button
-                  ElevatedButton(
-                    onPressed: _isSerialNumberValid ? _saveApplianceData : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 54, 83, 56),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 17,
-                        horizontal: 123,
+                  // Save and Cancel Buttons
+                  Column(
+                    children: [
+                      SizedBox(
+                        // SizedBox for width constraints
+                        width: 280, // Set your desired width here
+                        child: ElevatedButton(
+                          onPressed: _isSerialNumberValid && _isDeviceFound
+                              ? _saveApplianceData
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color.fromARGB(255, 54, 83, 56),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 17), // Remove horizontal padding
+                            textStyle: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Poppins',
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5.0),
+                            ),
+                          ),
+                          child: const Text('Save',
+                              style: TextStyle(color: Color(0xFFe8f5e9))),
+                        ),
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Poppins',
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        // SizedBox for width constraints
+                        width: 280, // Set your desired width here
+                        child: ElevatedButton(
+                          onPressed: _clearFields,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white, // White background
+                            foregroundColor: const Color.fromARGB(
+                                255, 72, 100, 68), // Dark red text
+                            side: const BorderSide(
+                                color: Color.fromARGB(
+                                    255, 72, 100, 68)), // Dark red border
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 17), // Remove horizontal padding
+                            textStyle: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Poppins',
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5.0),
+                            ),
+                          ),
+                          child: const Text(
+                              'Cancel'), // No need to specify text color (foregroundColor handles it)
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5.0),
-                      ),
-                    ),
-                    child: const Text(
-                      'Save',
-                      style: TextStyle(
-                        color: Color(0xFFe8f5e9),
-                      ),
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 10),
                 ],
               ),
             ),
