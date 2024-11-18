@@ -112,7 +112,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
                       : index == 2
                           ? 'Dashboard'
                           : index == 3
-                              ? 'History'
+                              ? 'Analytics'
                               : 'Help'),
             ),
           ),

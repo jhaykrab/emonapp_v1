@@ -503,206 +503,251 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
       body: Center(
         // Wrap the Container with Center
         child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            padding: EdgeInsets.all(12.0),
-            margin: EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-            child: _isLoading // Check if data is still loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color.fromARGB(255, 54, 83,
-                            56)), // Show loading indicator with dark green color
-                  )
-                : applianceProvider.appliances
-                        .isEmpty // Check if the list is empty after loading
-                    ? const Center(
-                        child: Text('No appliances set up yet.'),
-                      )
-                    : ListView.builder(
-                        itemCount: applianceProvider.appliances.length,
-                        itemBuilder: (context, index) {
-                          final appliance = applianceProvider.appliances[index];
+          width: MediaQuery.of(context).size.width * 0.8,
+          padding: EdgeInsets.all(12.0),
+          margin: EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          child: Column(
+            // Add a Column here
+            children: [
+              Container(
+                // Container for title with styling
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color.fromARGB(
+                        255, 54, 83, 56), // Dark green border
+                    width: 2.0, // Border width
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Appliances Realtime Sensor Readings",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color:
+                            Color.fromARGB(255, 54, 83, 56), // Text with color
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                  child: _isLoading // Check if data is still loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: Color.fromARGB(255, 54, 83,
+                                  56)), // Show loading indicator with dark green color
+                        )
+                      : applianceProvider.appliances
+                              .isEmpty // Check if the list is empty after loading
+                          ? const Center(
+                              child: Text('No appliances set up yet.'),
+                            )
+                          : ListView.builder(
+                              itemCount: applianceProvider.appliances.length,
+                              itemBuilder: (context, index) {
+                                final appliance =
+                                    applianceProvider.appliances[index];
 
-                          // Accessing data from the 'appliance' map
-                          final applianceDocId =
-                              appliance.documentId ?? 'Unknown';
-                          final applianceName = appliance.name ??
-                              'Unnamed Appliance'; // Fetching applianceName
-                          final applianceType = appliance.icon;
-                          final deviceSerialNumber =
-                              appliance.serialNumber ?? 'N/A';
+                                // Accessing data from the 'appliance' map
+                                final applianceDocId =
+                                    appliance.documentId ?? 'Unknown';
+                                final applianceName = appliance.name ??
+                                    'Unnamed Appliance'; // Fetching applianceName
+                                final applianceType = appliance.icon;
+                                final deviceSerialNumber =
+                                    appliance.serialNumber ?? 'N/A';
 
-                          // Determine the Realtime Database path based on serial number
-                          String dbPath = _getDbPath(deviceSerialNumber);
+                                // Determine the Realtime Database path based on serial number
+                                String dbPath = _getDbPath(deviceSerialNumber);
 
-                          return StreamBuilder<DatabaseEvent>(
-                            stream:
-                                FirebaseDatabase.instance.ref(dbPath).onValue,
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData &&
-                                  snapshot.data!.snapshot.value != null) {
-                                final data = snapshot.data!.snapshot.value
-                                    as Map<dynamic, dynamic>;
+                                return StreamBuilder<DatabaseEvent>(
+                                  stream: FirebaseDatabase.instance
+                                      .ref(dbPath)
+                                      .onValue,
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData &&
+                                        snapshot.data!.snapshot.value != null) {
+                                      final data = snapshot.data!.snapshot.value
+                                          as Map<dynamic, dynamic>;
 
-                                int runtimeHours = data['runtimehr'] ?? 0;
-                                int runtimeMinutes = data['runtimemin'] ?? 0;
-                                int runtimeSeconds = data['runtimesec'] ?? 0;
-                                bool isApplianceOn =
-                                    data['applianceState'] ?? false;
+                                      int runtimeHours = data['runtimehr'] ?? 0;
+                                      int runtimeMinutes =
+                                          data['runtimemin'] ?? 0;
+                                      int runtimeSeconds =
+                                          data['runtimesec'] ?? 0;
+                                      bool isApplianceOn =
+                                          data['applianceState'] ?? false;
 
-                                return _buildApplianceListContainer(
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            applianceType ??
-                                                Icons.device_unknown,
-                                            size: 32,
-                                            color: const Color.fromARGB(
-                                                255, 72, 100, 68),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Icon(
-                                            Icons.wifi,
-                                            size: 18,
-                                            color: isApplianceOn
-                                                ? Colors.green
-                                                : Colors.grey,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              MouseRegion(
-                                                onEnter: (_) => setState(() {}),
-                                                onExit: (_) => setState(() {}),
-                                                child: Tooltip(
-                                                  message: applianceName,
-                                                  preferBelow: false,
-                                                  child: Text(
-                                                    applianceName.length >
-                                                            maxNameLength
-                                                        ? '${applianceName.substring(0, maxNameLength)}...'
-                                                        : applianceName,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16,
+                                      return _buildApplianceListContainer(
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  applianceType ??
+                                                      Icons.device_unknown,
+                                                  size: 32,
+                                                  color: const Color.fromARGB(
+                                                      255, 72, 100, 68),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Icon(
+                                                  Icons.wifi,
+                                                  size: 18,
+                                                  color: isApplianceOn
+                                                      ? Colors.green
+                                                      : Colors.grey,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    MouseRegion(
+                                                      onEnter: (_) =>
+                                                          setState(() {}),
+                                                      onExit: (_) =>
+                                                          setState(() {}),
+                                                      child: Tooltip(
+                                                        message: applianceName,
+                                                        preferBelow: false,
+                                                        child: Text(
+                                                          applianceName.length >
+                                                                  maxNameLength
+                                                              ? '${applianceName.substring(0, maxNameLength)}...'
+                                                              : applianceName,
+                                                          style:
+                                                              const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 16,
+                                                          ),
+                                                        ),
+                                                      ),
                                                     ),
-                                                  ),
+                                                    Text(
+                                                      'Serial No: $deviceSerialNumber',
+                                                      style: const TextStyle(
+                                                          fontSize: 12),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    // Sensor readings
+                                                    Text(
+                                                      'Energy: ${data['energy'].toStringAsFixed(2)} kWh',
+                                                      style: const TextStyle(
+                                                          fontSize: 11),
+                                                    ),
+                                                    Text(
+                                                      'Voltage: ${data['voltage'].toStringAsFixed(1)} V',
+                                                      style: const TextStyle(
+                                                          fontSize: 11),
+                                                    ),
+                                                    Text(
+                                                      'Current: ${data['current'].toStringAsFixed(2)} A',
+                                                      style: const TextStyle(
+                                                          fontSize: 11),
+                                                    ),
+                                                    Text(
+                                                      'Power: ${data['power'].toStringAsFixed(2)} W',
+                                                      style: const TextStyle(
+                                                          fontSize: 11),
+                                                    ),
+                                                    // Display runtime
+                                                    Text(
+                                                      'Runtime: $runtimeHours hrs $runtimeMinutes mins $runtimeSeconds secs',
+                                                      style: const TextStyle(
+                                                          fontSize: 11),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                              Text(
-                                                'Serial No: $deviceSerialNumber',
-                                                style: const TextStyle(
-                                                    fontSize: 12),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              // Sensor readings
-                                              Text(
-                                                'Energy: ${data['energy'].toStringAsFixed(2)} kWh',
-                                                style: const TextStyle(
-                                                    fontSize: 11),
-                                              ),
-                                              Text(
-                                                'Voltage: ${data['voltage'].toStringAsFixed(1)} V',
-                                                style: const TextStyle(
-                                                    fontSize: 11),
-                                              ),
-                                              Text(
-                                                'Current: ${data['current'].toStringAsFixed(2)} A',
-                                                style: const TextStyle(
-                                                    fontSize: 11),
-                                              ),
-                                              Text(
-                                                'Power: ${data['power'].toStringAsFixed(2)} W',
-                                                style: const TextStyle(
-                                                    fontSize: 11),
-                                              ),
-                                              // Display runtime
-                                              Text(
-                                                'Runtime: $runtimeHours hrs $runtimeMinutes mins $runtimeSeconds secs',
-                                                style: const TextStyle(
-                                                    fontSize: 11),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Transform.scale(
-                                                scale: 0.75,
-                                                child: Switch(
-                                                  value: isApplianceOn,
-                                                  onChanged: (value) async {
-                                                    await applianceProvider
-                                                        .toggleAppliance(
-                                                            appliance, value);
-                                                  },
-                                                  activeTrackColor:
-                                                      Colors.green[700],
-                                                  activeColor:
-                                                      Colors.green[900],
-                                                  inactiveTrackColor:
-                                                      Colors.grey[400],
-                                                  inactiveThumbColor:
-                                                      Colors.grey[300],
+                                              ],
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Transform.scale(
+                                                      scale: 0.75,
+                                                      child: Switch(
+                                                        value: isApplianceOn,
+                                                        onChanged:
+                                                            (value) async {
+                                                          await applianceProvider
+                                                              .toggleAppliance(
+                                                                  appliance,
+                                                                  value);
+                                                        },
+                                                        activeTrackColor:
+                                                            Colors.green[700],
+                                                        activeColor:
+                                                            Colors.green[900],
+                                                        inactiveTrackColor:
+                                                            Colors.grey[400],
+                                                        inactiveThumbColor:
+                                                            Colors.grey[300],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
                                                 ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.edit),
-                                                onPressed: () =>
-                                                    _showEditDialog(
-                                                        appliance, index),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.delete,
-                                                    color: Colors.red),
-                                                onPressed: () =>
-                                                    _showRemoveConfirmationDialog(
-                                                        appliance),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                          Icons.edit),
+                                                      onPressed: () =>
+                                                          _showEditDialog(
+                                                              appliance, index),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                          Icons.delete,
+                                                          color: Colors.red),
+                                                      onPressed: () =>
+                                                          _showRemoveConfirmationDialog(
+                                                              appliance),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    } else if (snapshot.hasError) {
+                                      return _buildApplianceListContainer(
+                                        Text('Error: ${snapshot.error}'),
+                                      );
+                                    } else {
+                                      return _buildApplianceListContainer(
+                                        const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 );
-                              } else if (snapshot.hasError) {
-                                return _buildApplianceListContainer(
-                                  Text('Error: ${snapshot.error}'),
-                                );
-                              } else {
-                                return _buildApplianceListContainer(
-                                  const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      )),
+                              },
+                            )),
+            ],
+          ),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Padding(
