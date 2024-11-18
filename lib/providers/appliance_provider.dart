@@ -61,6 +61,12 @@ class ApplianceProvider with ChangeNotifier {
     }
   }
 
+  void addAppliance(Appliance appliance) {
+    //Define the function
+    _appliances.add(appliance);
+    notifyListeners();
+  }
+
   Future<void> editAppliance(
       Appliance appliance, String newName, IconData newIcon) async {
     String newApplianceType = applianceIcons.keys.firstWhere(
