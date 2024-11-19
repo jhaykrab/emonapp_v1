@@ -30,10 +30,13 @@ class _DailyPageState extends State<DailyPage> {
   bool _isLoading = true;
   late StreamSubscription<DatabaseEvent> _energySubscription;
 
+  List<Map<String, dynamic>> _historicalData = []; // Store historical data
+
   @override
   void initState() {
     super.initState();
     _listenForEnergyChanges();
+    _loadHistoricalData();
   }
 
   @override
@@ -99,23 +102,74 @@ class _DailyPageState extends State<DailyPage> {
       };
 
       try {
+        String dateString =
+            intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
         // Store the data in Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
             .collection('historical_data')
-            .doc('all_appliances')
-            .set(
-                historicalData,
-                SetOptions(
-                    merge:
-                        true)); // Use merge to avoid overwriting existing data
+            .doc(dateString)
+            .collection('all_appliances')
+            .doc('data')
+            .set(historicalData, SetOptions(merge: true));
 
         print('Data stored successfully!');
       } catch (e) {
         print('Error storing data: $e');
       }
     });
+  }
+
+  Future<void> _loadHistoricalData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('historical_data')
+            .get();
+
+        if (mounted) {
+          setState(() {
+            _historicalData = snapshot.docs
+                .map((doc) {
+                  // Get the date from the document ID
+                  String date = doc.id;
+
+                  // Get a reference to the all_appliances subcollection for this date
+                  CollectionReference allAppliancesRef = FirebaseFirestore
+                      .instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('historical_data')
+                      .doc(date)
+                      .collection('all_appliances');
+
+                  // Fetch the 'data' document from the subcollection asynchronously
+                  return allAppliancesRef
+                      .doc('data')
+                      .get()
+                      .then((subcollectionDoc) {
+                    // Return a map containing the date and totalEnergy
+                    if (subcollectionDoc.exists) {
+                      Map<String, dynamic> subcollectionData =
+                          subcollectionDoc.data() as Map<String, dynamic>;
+                      subcollectionData['date'] = date;
+                      return subcollectionData;
+                    }
+                    return null; // Or handle the case where the 'data' document doesn't exist
+                  });
+                })
+                .whereType<Map<String, dynamic>>()
+                .toList(); //Remove any null values
+          });
+        }
+      }
+    } on Exception catch (e) {
+      print('Error loading historical data: $e');
+    }
   }
 
   DateTime startOfDay(DateTime dateTime) =>
@@ -278,6 +332,133 @@ class _DailyPageState extends State<DailyPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHistoricalEnergyCard(Map<String, dynamic> data) {
+    DateTime date = intl.DateFormat('yyyy-MM-dd').parse(data['date']);
+    double historicalTotalEnergy = (data['totalEnergy'] ?? 0.0).toDouble();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(0.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 219, 217, 217).withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(5.0),
+        child: SizedBox(
+          width: 330, // Set your desired width here
+          child: Table(
+            border: TableBorder.all(
+              color: const Color.fromARGB(255, 54, 83, 56),
+              width: 0.5,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            columnWidths: const {
+              0: FlexColumnWidth(0.8),
+              1: FlexColumnWidth(1.4),
+            },
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: [
+              TableRow(
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 54, 83, 56),
+                ),
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.all(6.0), // Increased padding
+                    child: Text(
+                      'Variables',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(6.0), // Increased padding
+                    child: Text(
+                      'Values',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              TableRow(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(6.0), // Reduced padding
+                    child: Text(
+                      'Date  (Today)',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(6.0), // Reduced padding
+                    child: Text(
+                      DateFormat('EEEE, MMMM d, y').format(DateTime.now()),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+              TableRow(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(6.0),
+                    child: Text(
+                      'Total Energy',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: Text(
+                        '$historicalTotalEnergy kWh', // Display historical data
+                        style: const TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+              TableRow(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(6.0),
+                    child: Text(
+                      'Description',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                  Padding(
+                      padding: EdgeInsets.all(6.0),
+                      child: Text(
+                        (historicalTotalEnergy <= 1
+                            ? 'Low Energy Consumption'
+                            : 'Energy Usage Moderate to High'),
+                        style: TextStyle(fontSize: 11),
+                      )),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
