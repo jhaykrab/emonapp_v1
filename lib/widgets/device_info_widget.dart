@@ -145,7 +145,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
                         ),
                         Text(
                           // Display runtime below Device On/Off
-                          'Runtime: $runtimeHours hrs $runtimeMinutes mins $runtimeSeconds secs',
+                          'Runtime: $runtimeHours h $runtimeMinutes m $runtimeSeconds s',
                           style: const TextStyle(fontSize: 11),
                         ),
                       ],
