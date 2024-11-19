@@ -13,7 +13,7 @@ import 'package:Emon/services/global_state.dart';
 import 'package:Emon/providers/appliance_provider.dart';
 import 'package:Emon/screens/appliance_list.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:intl/date_symbol_data_local.dart'; // For initializeDateFormatting
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

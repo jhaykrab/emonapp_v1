@@ -6,15 +6,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:Emon/widgets/time_buttons.dart';
-import 'package:Emon/screens/daily_page_testmode.dart';
+import 'package:Emon/screens/daily_page.dart';
 
-class DailyPage extends StatefulWidget {
+class DailyPageTestMode extends StatefulWidget {
   final int selectedTabIndex;
   final PageController pageController;
   final Function(int) setSelectedTabIndex;
   final Function(int) onTimeButtonTapped;
 
-  const DailyPage({
+  const DailyPageTestMode({
     Key? key,
     required this.selectedTabIndex,
     required this.pageController,
@@ -23,11 +23,14 @@ class DailyPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<DailyPage> createState() => _DailyPage();
+  State<DailyPageTestMode> createState() =>
+      _DailyPageTestModeState(); //Corrected
 }
 
-class _DailyPage extends State<DailyPage> {
+class _DailyPageTestModeState extends State<DailyPageTestMode> {
+  //Corrected
   double _totalEnergy = 0.0;
+  bool _isLoading = true;
   bool _isSendingData = false;
   bool _isDeleting = false;
   late Timer _dataTimer;
@@ -36,95 +39,79 @@ class _DailyPage extends State<DailyPage> {
   @override
   void initState() {
     super.initState();
-    _loadHistoricalData(); // Load historical data on initialization
   }
 
   @override
   void dispose() {
-    if (_isSendingData) {
-      _dataTimer.cancel();
-    }
+    _dataTimer.cancel();
     super.dispose();
   }
 
-  void _startDailyDataSending() {
+  void _startContinuousDataSending() {
     if (_isSendingData) return;
 
     _isSendingData = true;
 
-    void scheduleNextDataSend() {
-      DateTime now = DateTime.now();
-      DateTime nextRunTime = DateTime(now.year, now.month, now.day, 23, 59);
+    _dataTimer = Timer.periodic(const Duration(seconds: 20), (timer) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final dbRef = FirebaseDatabase.instance.ref();
+        final paths = [
+          'SensorReadings',
+          'SensorReadings_2',
+          'SensorReadings_3'
+        ];
 
-      if (now.isAfter(nextRunTime)) {
-        nextRunTime = nextRunTime.add(const Duration(days: 1));
-      }
+        double totalEnergy = 0;
 
-      Duration durationUntilNextRun = nextRunTime.difference(now);
+        for (final path in paths) {
+          final snapshot = await dbRef.child(path).get();
+          if (snapshot.exists) {
+            final data = snapshot.value as Map<dynamic, dynamic>;
+            if (data['uid'] == user.uid) {
+              totalEnergy += (data['energy'] ?? 0.0).toDouble();
+            }
+          }
+        }
 
-      _dataTimer = Timer(durationUntilNextRun, () async {
-        await _sendDailyData();
-        if (_isSendingData) scheduleNextDataSend(); // Schedule for the next day
-      });
-    }
+        if (mounted) {
+          setState(() {
+            _totalEnergy = totalEnergy;
+            _isLoading = false;
+          });
 
-    scheduleNextDataSend();
-  }
+          DateTime currentDateTime = DateTime.now();
+          String formattedDateTime =
+              intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
 
-  Future<void> _sendDailyData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final paths = ['SensorReadings', 'SensorReadings_2', 'SensorReadings_3'];
+          String description = (totalEnergy <= 1)
+              ? 'Low Energy Consumption'
+              : 'Energy Usage Moderate to High';
 
-      double totalEnergy = 0;
+          final historicalData = <String, dynamic>{
+            'timestamp': currentDateTime,
+            'totalEnergy': totalEnergy,
+            'description': description,
+          };
 
-      for (final path in paths) {
-        final snapshot = await dbRef.child(path).get();
-        if (snapshot.exists) {
-          final data = snapshot.value as Map<dynamic, dynamic>;
-          if (data['uid'] == user.uid) {
-            totalEnergy += (data['energy'] ?? 0.0).toDouble();
+          try {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('historical_data_testmode')
+                .doc(formattedDateTime)
+                .set(historicalData, SetOptions(merge: true));
+
+            _loadHistoricalData();
+          } catch (e) {
+            print('Error storing data: $e');
           }
         }
       }
-
-      if (mounted) {
-        setState(() {
-          _totalEnergy = totalEnergy;
-        });
-
-        DateTime currentDateTime = DateTime.now();
-        String formattedDateTime =
-            intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
-
-        String description = (totalEnergy <= 1)
-            ? 'Low Energy Consumption'
-            : 'Energy Usage Moderate to High';
-
-        final historicalData = <String, dynamic>{
-          'timestamp': currentDateTime,
-          'totalEnergy': totalEnergy,
-          'description': description,
-        };
-
-        try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('historical_data')
-              .doc(formattedDateTime)
-              .set(historicalData, SetOptions(merge: true));
-
-          _loadHistoricalData();
-        } catch (e) {
-          print('Error storing data: $e');
-        }
-      }
-    }
+    });
   }
 
-  void _stopDailyDataSending() {
+  void _stopContinuousDataSending() {
     if (!_isSendingData) return;
 
     _isSendingData = false;
@@ -138,7 +125,7 @@ class _DailyPage extends State<DailyPage> {
         final snapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .collection('historical_data')
+            .collection('historical_data_testmode')
             .get();
 
         if (snapshot.docs.isNotEmpty) {
@@ -150,7 +137,7 @@ class _DailyPage extends State<DailyPage> {
             final subDoc = await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
-                .collection('historical_data')
+                .collection('historical_data_testmode')
                 .doc(dateTime)
                 .get();
 
@@ -205,7 +192,7 @@ class _DailyPage extends State<DailyPage> {
         final collection = FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .collection('historical_data');
+            .collection('historical_data_testmode');
 
         final snapshot = await collection.get();
 
@@ -333,10 +320,8 @@ class _DailyPage extends State<DailyPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.all(6.0),
-                    child: Text(
-                      '${data['totalEnergy']} kWh',
-                      style: const TextStyle(fontSize: 11),
-                    ),
+                    child: Text('${data['totalEnergy']} kWh',
+                        style: const TextStyle(fontSize: 11)),
                   ),
                 ],
               ),
@@ -345,7 +330,7 @@ class _DailyPage extends State<DailyPage> {
                   const Padding(
                     padding: EdgeInsets.all(6.0),
                     child: Text(
-                      'Status',
+                      'Description',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                     ),
@@ -356,16 +341,13 @@ class _DailyPage extends State<DailyPage> {
                       children: [
                         Icon(
                           statusIcon,
-                          size: 16,
                           color: statusColor,
+                          size: 14, // Small icon size for better alignment
                         ),
                         const SizedBox(width: 5),
                         Text(
                           data['description'],
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: statusColor,
-                          ),
+                          style: TextStyle(fontSize: 11, color: statusColor),
                         ),
                       ],
                     ),
@@ -415,10 +397,9 @@ class _DailyPage extends State<DailyPage> {
 
           // Add TimeButtons widget here
           TimeButtons(
-            pageController: widget.pageController, // Access via widget.
-            selectedTabIndex: widget.selectedTabIndex, // Access via widget.
-            setSelectedTabIndex:
-                widget.setSelectedTabIndex, // Access via widget.
+            pageController: widget.pageController,
+            selectedTabIndex: widget.selectedTabIndex,
+            setSelectedTabIndex: widget.setSelectedTabIndex,
             onTimeButtonTapped: widget.onTimeButtonTapped,
           ),
           const SizedBox(height: 20),
@@ -427,7 +408,7 @@ class _DailyPage extends State<DailyPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DailyPageTestMode(),
+                  builder: (context) => DailyPage(),
                 ),
               );
             },
@@ -447,7 +428,7 @@ class _DailyPage extends State<DailyPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(width: 12),
-                Text('Switch to Test Mode'),
+                Text('Switch to Scheduled Mode'),
               ],
             ),
           ),
@@ -482,7 +463,7 @@ class _DailyPage extends State<DailyPage> {
                 onPressed: _isSendingData
                     ? null
                     : () {
-                        _startDailyDataSending();
+                        _startContinuousDataSending();
                       },
                 child: const Text('Start Sending Data'),
               ),
@@ -491,7 +472,7 @@ class _DailyPage extends State<DailyPage> {
                 onPressed: !_isSendingData
                     ? null
                     : () {
-                        _stopDailyDataSending();
+                        _stopContinuousDataSending();
                       },
                 child: const Text('Pause Sending Data'),
               ),
