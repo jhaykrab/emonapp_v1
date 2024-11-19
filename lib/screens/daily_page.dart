@@ -26,11 +26,12 @@ class DailyPage extends StatefulWidget {
 }
 
 class _DailyPageState extends State<DailyPage> {
+  Timer? _storageTimer;
   double _totalEnergy = 0.0;
   bool _isLoading = true;
   late StreamSubscription<DatabaseEvent> _energySubscription;
 
-  List<Map<String, dynamic>> _historicalData = []; // Store historical data
+  List<Map<String, dynamic>> _historicalData = [];
 
   @override
   void initState() {
@@ -73,9 +74,6 @@ class _DailyPageState extends State<DailyPage> {
               _totalEnergy = totalEnergy;
               _isLoading = false;
             });
-
-            // Schedule data storage for after 11:59 PM
-            _scheduleDataStorage(user.uid, totalEnergy);
           }
         });
       }
@@ -89,13 +87,12 @@ class _DailyPageState extends State<DailyPage> {
     }
   }
 
-  void _scheduleDataStorage(String userId, double totalEnergy) {
-    DateTime now = DateTime.now();
-    DateTime nextMidnight = DateTime(now.year, now.month, now.day + 1);
+  void _scheduleDataStorage(String userId) {
+    // Cancel any existing timer to prevent multiple timers
+    _storageTimer?.cancel();
 
-    Duration timeUntilMidnight = nextMidnight.difference(now);
-
-    Timer(timeUntilMidnight, () async {
+    _storageTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      double totalEnergy = await _calculateTotalEnergy(userId);
       final historicalData = <String, dynamic>{
         'timestamp': DateTime.now(),
         'totalEnergy': totalEnergy,
@@ -103,8 +100,8 @@ class _DailyPageState extends State<DailyPage> {
 
       try {
         String dateString =
-            intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
-        // Store the data in Firestore
+            intl.DateFormat('yyyy-MM-dd-HH-mm-ss').format(DateTime.now());
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
@@ -115,10 +112,81 @@ class _DailyPageState extends State<DailyPage> {
             .set(historicalData, SetOptions(merge: true));
 
         print('Data stored successfully!');
+        _loadHistoricalData(); // Refresh UI
       } catch (e) {
         print('Error storing data: $e');
       }
     });
+  }
+
+  Future<double> _calculateTotalEnergy(String userId) async {
+    final dbRef = FirebaseDatabase.instance.ref();
+    final paths = ['SensorReadings', 'SensorReadings_2', 'SensorReadings_3'];
+    double totalEnergy = 0;
+    for (final path in paths) {
+      final snapshot = await dbRef.child(path).get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        if (data['uid'] == userId) {
+          totalEnergy += (data['energy'] ?? 0.0).toDouble();
+        }
+      }
+    }
+    return totalEnergy;
+  }
+
+  Future<void> _resetHistoricalData() async {
+    try {
+      _storageTimer?.cancel();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final instance = FirebaseFirestore.instance;
+        final collection = instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('historical_data');
+        final snapshot = await collection.get();
+        for (var doc in snapshot.docs) {
+          await collection.doc(doc.id).delete();
+        }
+        setState(() {
+          _historicalData = [];
+        });
+        print("Historical data reset successfully!");
+      }
+    } catch (e) {
+      print("Error resetting historical data: $e");
+    }
+  }
+
+  Future<void> _clearTestDataFromFirestore() async {
+    // New function
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final instance = FirebaseFirestore.instance;
+        final collection = instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('historical_data');
+
+        // Get all documents in 'historical_data'
+        final snapshot = await collection.get();
+
+        // Delete each document
+        for (var doc in snapshot.docs) {
+          await collection.doc(doc.id).delete();
+        }
+
+        setState(() {
+          _historicalData = [];
+        });
+
+        print('Test data cleared from Firestore successfully!');
+      }
+    } catch (e) {
+      print('Error clearing test data: $e');
+    }
   }
 
   Future<void> _loadHistoricalData() async {
@@ -135,10 +203,7 @@ class _DailyPageState extends State<DailyPage> {
           setState(() {
             _historicalData = snapshot.docs
                 .map((doc) {
-                  // Get the date from the document ID
                   String date = doc.id;
-
-                  // Get a reference to the all_appliances subcollection for this date
                   CollectionReference allAppliancesRef = FirebaseFirestore
                       .instance
                       .collection('users')
@@ -146,24 +211,21 @@ class _DailyPageState extends State<DailyPage> {
                       .collection('historical_data')
                       .doc(date)
                       .collection('all_appliances');
-
-                  // Fetch the 'data' document from the subcollection asynchronously
                   return allAppliancesRef
                       .doc('data')
                       .get()
                       .then((subcollectionDoc) {
-                    // Return a map containing the date and totalEnergy
                     if (subcollectionDoc.exists) {
                       Map<String, dynamic> subcollectionData =
                           subcollectionDoc.data() as Map<String, dynamic>;
                       subcollectionData['date'] = date;
                       return subcollectionData;
                     }
-                    return null; // Or handle the case where the 'data' document doesn't exist
+                    return null;
                   });
                 })
                 .whereType<Map<String, dynamic>>()
-                .toList(); //Remove any null values
+                .toList();
           });
         }
       }
@@ -336,7 +398,8 @@ class _DailyPageState extends State<DailyPage> {
   }
 
   Widget _buildHistoricalEnergyCard(Map<String, dynamic> data) {
-    DateTime date = intl.DateFormat('yyyy-MM-dd').parse(data['date']);
+    DateTime date = intl.DateFormat('yyyy-MM-dd-HH-mm-ss')
+        .parse(data['date']); // Parse date and time
     double historicalTotalEnergy = (data['totalEnergy'] ?? 0.0).toDouble();
 
     return Container(
@@ -403,7 +466,7 @@ class _DailyPageState extends State<DailyPage> {
                   const Padding(
                     padding: EdgeInsets.all(6.0), // Reduced padding
                     child: Text(
-                      'Date  (Today)',
+                      'Date',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                     ),
@@ -496,14 +559,43 @@ class _DailyPageState extends State<DailyPage> {
         ),
         const SizedBox(height: 50),
         TimeButtons(
-          pageController: widget.pageController, // Access via widget.
-          selectedTabIndex: widget.selectedTabIndex, // Access via widget.
-          setSelectedTabIndex: widget.setSelectedTabIndex, // Access via widget.
-          onTimeButtonTapped: widget.onTimeButtonTapped, // Access via widget.
+          pageController: widget.pageController,
+          selectedTabIndex: widget.selectedTabIndex,
+          setSelectedTabIndex: widget.setSelectedTabIndex,
+          onTimeButtonTapped: widget.onTimeButtonTapped,
         ),
         const SizedBox(height: 30),
         Expanded(
-          child: _buildCurrentEnergyCard(),
+          child: ListView(
+            children: [
+              _buildCurrentEnergyCard(),
+              ..._historicalData
+                  .map((data) => _buildHistoricalEnergyCard(data)),
+            ],
+          ),
+        ),
+        ElevatedButton(
+          // Test button (starts the periodic timer)
+          onPressed: () {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              _scheduleDataStorage(user.uid);
+            }
+          },
+          child: const Text('Test'),
+        ),
+        ElevatedButton(
+          // Stop button (stops the timer)
+          onPressed: _resetHistoricalData,
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Stop'),
+        ),
+        ElevatedButton(
+          // "Clear" button (clears test data)
+          onPressed: _clearTestDataFromFirestore, // Call the clear function
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange), // Style as needed
+          child: const Text('Clear Test Data'),
         ),
       ],
     );
