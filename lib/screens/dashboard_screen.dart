@@ -20,6 +20,7 @@ import 'realtime_page.dart';
 import 'daily_page.dart';
 import 'weekly_page.dart';
 import 'monthly_page.dart';
+import 'daily_page_testmode.dart';
 import 'appliance_list.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -228,6 +229,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTimeButtonTapped: _onTimeButtonTapped,
                 ),
                 DailyPage(
+                  selectedTabIndex: _selectedTabIndex,
+                  setSelectedTabIndex: setSelectedTabIndex,
+                  pageController: _pageController, // Pass pageController
+                  onTimeButtonTapped: _onTimeButtonTapped,
+                ),
+                DailyPageTestMode(
                   selectedTabIndex: _selectedTabIndex,
                   setSelectedTabIndex: setSelectedTabIndex,
                   pageController: _pageController, // Pass pageController

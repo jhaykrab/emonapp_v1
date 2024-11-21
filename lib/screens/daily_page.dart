@@ -23,360 +23,169 @@ class DailyPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<DailyPage> createState() => _DailyPage();
+  State<DailyPage> createState() => _DailyPageState();
 }
 
-class _DailyPage extends State<DailyPage> {
+class _DailyPageState extends State<DailyPage> {
   double _totalEnergy = 0.0;
-  bool _isSendingData = false;
-  bool _isDeleting = false;
+  late Timer _updateTimer;
   late Timer _dataTimer;
+  late Timer _timeUpdateTimer;
+  bool _isSendingData = false;
   List<Map<String, dynamic>> _historicalData = [];
+
+  Map<String, dynamic> _currentEnergyData = {
+    'dateTime': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+    'totalEnergy': 0.0,
+    'description': 'Initializing...',
+  };
 
   @override
   void initState() {
     super.initState();
-    _loadHistoricalData(); // Load historical data on initialization
+    _loadRealTimeData();
+    _startDailyDataSending();
+    _loadHistoricalData();
+    _startDateTimeUpdater();
   }
 
   @override
   void dispose() {
+    _updateTimer.cancel();
     if (_isSendingData) {
       _dataTimer.cancel();
     }
+    _timeUpdateTimer.cancel();
     super.dispose();
   }
 
+  /// Updates the current dateTime value every second.
+  void _startDateTimeUpdater() {
+    _timeUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _currentEnergyData['dateTime'] =
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      });
+    });
+  }
+
+  /// Loads real-time data from Firebase Realtime Database and sums the energy readings.
+  void _loadRealTimeData() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final dbRef = FirebaseDatabase.instance.ref();
+    const paths = ['SensorReadings', 'SensorReadings_2', 'SensorReadings_3'];
+
+    dbRef.child('/').onValue.listen((event) {
+      final allData = event.snapshot.value as Map<dynamic, dynamic>?;
+
+      if (allData != null) {
+        double totalEnergy = 0.0;
+
+        for (var path in paths) {
+          final sensorData = allData[path] as Map<dynamic, dynamic>?;
+
+          if (sensorData != null && sensorData['uid'] == user.uid) {
+            totalEnergy += (sensorData['energy'] ?? 0.0).toDouble();
+          }
+        }
+
+        setState(() {
+          _totalEnergy = totalEnergy;
+          _currentEnergyData = {
+            'dateTime':
+                DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+            'totalEnergy': _totalEnergy,
+            'description': _totalEnergy <= 1
+                ? 'Low Energy Consumption'
+                : 'Energy Usage Moderate to High',
+          };
+        });
+      }
+    });
+  }
+
+  /// Schedules daily data sending at 11:59 PM.
   void _startDailyDataSending() {
     if (_isSendingData) return;
-
     _isSendingData = true;
 
     void scheduleNextDataSend() {
-      DateTime now = DateTime.now();
-      DateTime nextRunTime = DateTime(now.year, now.month, now.day, 23, 59);
-
-      if (now.isAfter(nextRunTime)) {
-        nextRunTime = nextRunTime.add(const Duration(days: 1));
-      }
-
-      Duration durationUntilNextRun = nextRunTime.difference(now);
+      final now = DateTime.now();
+      final nextRunTime = DateTime(now.year, now.month, now.day, 23, 59).add(
+        now.isAfter(DateTime(now.year, now.month, now.day, 23, 59))
+            ? const Duration(days: 1)
+            : Duration.zero,
+      );
+      final durationUntilNextRun = nextRunTime.difference(now);
 
       _dataTimer = Timer(durationUntilNextRun, () async {
         await _sendDailyData();
-        if (_isSendingData) scheduleNextDataSend(); // Schedule for the next day
+        if (_isSendingData) scheduleNextDataSend();
       });
     }
 
     scheduleNextDataSend();
   }
 
+  /// Sends daily energy consumption data to Firestore.
   Future<void> _sendDailyData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final paths = ['SensorReadings', 'SensorReadings_2', 'SensorReadings_3'];
-
-      double totalEnergy = 0;
-
-      for (final path in paths) {
-        final snapshot = await dbRef.child(path).get();
-        if (snapshot.exists) {
-          final data = snapshot.value as Map<dynamic, dynamic>;
-          if (data['uid'] == user.uid) {
-            totalEnergy += (data['energy'] ?? 0.0).toDouble();
-          }
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _totalEnergy = totalEnergy;
-        });
-
-        DateTime currentDateTime = DateTime.now();
-        String formattedDateTime =
-            intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
-
-        String description = (totalEnergy <= 1)
-            ? 'Low Energy Consumption'
-            : 'Energy Usage Moderate to High';
-
-        final historicalData = <String, dynamic>{
-          'timestamp': currentDateTime,
-          'totalEnergy': totalEnergy,
-          'description': description,
-        };
-
-        try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('historical_data')
-              .doc(formattedDateTime)
-              .set(historicalData, SetOptions(merge: true));
-
-          _loadHistoricalData();
-        } catch (e) {
-          print('Error storing data: $e');
-        }
-      }
-    }
-  }
-
-  void _stopDailyDataSending() {
-    if (!_isSendingData) return;
-
-    _isSendingData = false;
-    _dataTimer.cancel();
-  }
-
-  Future<void> _loadHistoricalData() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('historical_data')
-            .get();
-
-        if (snapshot.docs.isNotEmpty) {
-          List<Map<String, dynamic>> loadedData = [];
-
-          for (var doc in snapshot.docs) {
-            String dateTime = doc.id;
-
-            final subDoc = await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .collection('historical_data')
-                .doc(dateTime)
-                .get();
-
-            if (subDoc.exists) {
-              Map<String, dynamic> data = subDoc.data()!;
-              data['dateTime'] = dateTime;
-              loadedData.add(data);
-            }
-          }
-
-          if (mounted) {
-            setState(() {
-              _historicalData = loadedData;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      print('Error loading historical data: $e');
-    }
-  }
-
-  Future<void> _deleteAllHistoricalData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: const Text(
-            'Are you sure you want to delete all historical data? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    final currentDateTime = DateTime.now();
+    final formattedDateTime =
+        intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
 
-    if (confirm == true) {
-      setState(() {
-        _isDeleting = true;
-      });
+    final data = <String, dynamic>{
+      'timestamp': currentDateTime,
+      'totalEnergy': _totalEnergy,
+      'description': _totalEnergy <= 1
+          ? 'Low Energy Consumption'
+          : 'Energy Usage Moderate to High',
+    };
 
-      try {
-        final collection = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('historical_data');
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('historical_data')
+          .doc(formattedDateTime)
+          .set(data, SetOptions(merge: true));
 
-        final snapshot = await collection.get();
-
-        WriteBatch batch = FirebaseFirestore.instance.batch();
-
-        for (var doc in snapshot.docs) {
-          batch.delete(doc.reference);
-        }
-
-        await batch.commit();
-
-        setState(() {
-          _historicalData.clear();
-          _isDeleting = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('All historical data deleted successfully.')),
-        );
-      } catch (e) {
-        setState(() {
-          _isDeleting = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete historical data: $e')),
-        );
-      }
+      _loadHistoricalData();
+    } catch (e) {
+      debugPrint('Error sending daily data: $e');
     }
   }
 
-  Widget _buildEnergyDataCard(Map<String, dynamic> data) {
-    // Define the color and icon based on the description
-    Color statusColor;
-    IconData statusIcon;
+  /// Loads historical data from Firestore.
+  Future<void> _loadHistoricalData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-    if (data['description'] == 'Low Energy Consumption') {
-      statusColor = Colors.green; // Green for low consumption
-      statusIcon = Icons.check_circle_outline; // Checkmark icon
-    } else {
-      statusColor = Colors.orange; // Orange for moderate/high consumption
-      statusIcon = Icons.warning_amber_outlined; // Warning icon
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('historical_data')
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final loadedData = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['dateTime'] = doc.id;
+          return data;
+        }).toList();
+
+        if (mounted) {
+          setState(() => _historicalData = loadedData);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading historical data: $e');
     }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(5.0),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(5.0),
-        child: SizedBox(
-          width: 320, // Consistent width
-          child: Table(
-            border: TableBorder.all(
-              color: const Color.fromARGB(255, 54, 83, 56),
-              width: 0.5,
-              borderRadius: BorderRadius.circular(5),
-            ),
-            columnWidths: const {
-              0: FlexColumnWidth(0.8),
-              1: FlexColumnWidth(1.4),
-            },
-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-            children: [
-              TableRow(
-                decoration: const BoxDecoration(
-                  color: Color.fromARGB(255, 54, 83, 56),
-                ),
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.all(6.0),
-                    child: Text(
-                      'Variables',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.normal,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(6.0),
-                    child: Text(
-                      'Values',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.normal,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(6.0),
-                    child: Text(
-                      'Date & Time',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(6.0),
-                    child: Text(
-                      data['dateTime'],
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(6.0),
-                    child: Text(
-                      'Total Energy',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(6.0),
-                    child: Text(
-                      '${data['totalEnergy']} kWh',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-              TableRow(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(6.0),
-                    child: Text(
-                      'Status',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(6.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          statusIcon,
-                          size: 16,
-                          color: statusColor,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          data['description'],
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: statusColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -385,132 +194,169 @@ class _DailyPage extends State<DailyPage> {
       body: Column(
         children: [
           const SizedBox(height: 20),
-          Container(
-            // Use a Container instead of OutlinedButton
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color:
-                    const Color.fromARGB(255, 54, 83, 56), // Dark green border
-                width: 2.0, // Increased border width
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.bolt,
-                    color:
-                        Color.fromARGB(255, 231, 175, 22)), // Icon with color
-                SizedBox(width: 8),
-                Text("Daily Consumption",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(
-                            255, 54, 83, 56))), // Text with color
-              ],
-            ),
-          ),
-          SizedBox(height: 30),
-
-          // Add TimeButtons widget here
+          _buildHeader(),
+          const SizedBox(height: 30),
           TimeButtons(
-            pageController: widget.pageController, // Access via widget.
-            selectedTabIndex: widget.selectedTabIndex, // Access via widget.
-            setSelectedTabIndex:
-                widget.setSelectedTabIndex, // Access via widget.
+            pageController: widget.pageController,
+            selectedTabIndex: widget.selectedTabIndex,
+            setSelectedTabIndex: widget.setSelectedTabIndex,
             onTimeButtonTapped: widget.onTimeButtonTapped,
           ),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DailyPageTestMode(),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 54, 83, 56),
-              foregroundColor: const Color(0xFFe8f5e9),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 20),
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(width: 12),
-                Text('Switch to Test Mode'),
-              ],
-            ),
-          ),
+          _buildDailyEnergyDataCard(_currentEnergyData),
           const SizedBox(height: 30),
-          _buildEnergyDataCard({
-            'dateTime':
-                DateFormat('yyyy-MM-dd_HH:mm:ss').format(DateTime.now()),
-            'totalEnergy': _totalEnergy,
-            'description': _totalEnergy <= 1
-                ? 'Low Energy Consumption'
-                : 'Energy Usage Moderate to High'
-          }),
-          const Divider(height: 20),
-          Expanded(
-            child: Center(
-              child: SizedBox(
-                width: 320, // Explicitly match the desired width
-                child: ListView.builder(
-                  itemCount: _historicalData.length,
-                  itemBuilder: (context, index) {
-                    var data = _historicalData[index];
-                    return _buildEnergyDataCard(data);
-                  },
-                ),
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _isSendingData
-                    ? null
-                    : () {
-                        _startDailyDataSending();
-                      },
-                child: const Text('Start Sending Data'),
-              ),
-              const SizedBox(width: 20),
-              ElevatedButton(
-                onPressed: !_isSendingData
-                    ? null
-                    : () {
-                        _stopDailyDataSending();
-                      },
-                child: const Text('Pause Sending Data'),
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _isDeleting ? null : _deleteAllHistoricalData,
-                child: _isDeleting
-                    ? const CircularProgressIndicator()
-                    : const Text('Delete All Data'),
-              ),
-              const SizedBox(width: 20),
-            ],
+          _buildEnergyDataList(),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the daily energy data table card.
+  Widget _buildDailyEnergyDataCard(Map<String, dynamic> data) {
+    final statusColor = data['description'] == 'Low Energy Consumption'
+        ? Colors.green
+        : Colors.orange;
+    final statusIcon = data['description'] == 'Low Energy Consumption'
+        ? Icons.check_circle_outline
+        : Icons.warning_amber_outlined;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5.0),
+      ),
+      child: Table(
+        border: TableBorder.all(
+          color: const Color.fromARGB(255, 54, 83, 56),
+          width: 0.5,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(0.8),
+          1: FlexColumnWidth(1.4),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          _buildTableHeaderRow(),
+          _buildTableDataRow('Date & Time', data['dateTime']),
+          _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
+          _buildTableDataRowWithIcon(
+            'Description',
+            data['description'],
+            statusIcon,
+            statusColor,
           ),
         ],
       ),
+    );
+  }
+
+  /// Builds a data row with an icon and description (for description with icon).
+  TableRow _buildTableDataRowWithIcon(
+      String label, String value, IconData icon, Color color) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 5),
+              Text(value, style: TextStyle(fontSize: 11, color: color)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the header for the Daily Consumption section.
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: const Color.fromARGB(255, 54, 83, 56),
+          width: 2.0,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.bolt, color: Color.fromARGB(255, 231, 175, 22)),
+          SizedBox(width: 8),
+          Text(
+            "Daily Consumption",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color.fromARGB(255, 54, 83, 56),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the historical energy data list.
+  Widget _buildEnergyDataList() {
+    return Expanded(
+      child: ListView.builder(
+        itemCount: _historicalData.length,
+        itemBuilder: (context, index) {
+          return _buildDailyEnergyDataCard(_historicalData[index]);
+        },
+      ),
+    );
+  }
+
+  /// Helper method to build rows for the table.
+  TableRow _buildTableHeaderRow() {
+    return const TableRow(
+      decoration: BoxDecoration(color: Color.fromARGB(255, 54, 83, 56)),
+      children: [
+        Padding(
+          padding: EdgeInsets.all(6.0),
+          child: Text(
+            'Variables',
+            style: TextStyle(fontSize: 12, color: Colors.white),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.all(6.0),
+          child: Text(
+            'Values',
+            style: TextStyle(fontSize: 12, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  TableRow _buildTableDataRow(String label, String value) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 11),
+          ),
+        ),
+      ],
     );
   }
 }

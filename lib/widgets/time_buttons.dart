@@ -1,57 +1,53 @@
 // time_buttons.dart
 import 'package:flutter/material.dart';
 import 'package:Emon/widgets/time_button_widget.dart';
-import 'package:Emon/screens/dashboard_screen.dart';
 
 class TimeButtons extends StatelessWidget {
-  final PageController pageController; // Keep pageController
+  final PageController pageController;
   final int selectedTabIndex;
-  final Function(int) setSelectedTabIndex;
-  final Function(int) onTimeButtonTapped; // Add the callback as a parameter
+  final ValueChanged<int> setSelectedTabIndex;
+  final ValueChanged<int> onTimeButtonTapped; // Add this parameter
 
   const TimeButtons({
     Key? key,
     required this.pageController,
     required this.selectedTabIndex,
     required this.setSelectedTabIndex,
-    required this.onTimeButtonTapped, // Make it required
+    required this.onTimeButtonTapped, // Initialize it here
   }) : super(key: key);
 
-  void _onTimeButtonTapped(int index) {
+  /// Handles the button tap and updates the selected tab and page.
+  void _handleTimeButtonTapped(int index) {
     setSelectedTabIndex(index);
     pageController.jumpToPage(index);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        TimeButtonWidget(
-          label: 'R-Time',
-          index: 0,
-          selectedTabIndex: selectedTabIndex,
-          onPressed: () => _onTimeButtonTapped(0),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildTimeButton('R-Time', 0),
+            _buildTimeButton('Daily', 1),
+            _buildTimeButton('Weekly', 3),
+            _buildTimeButton('Monthly', 4),
+            _buildTimeButton('Test Mode', 2),
+          ],
         ),
-        TimeButtonWidget(
-          label: 'Daily',
-          index: 1,
-          selectedTabIndex: selectedTabIndex,
-          onPressed: () => _onTimeButtonTapped(1),
-        ),
-        TimeButtonWidget(
-          label: 'Weekly',
-          index: 2,
-          selectedTabIndex: selectedTabIndex,
-          onPressed: () => _onTimeButtonTapped(2),
-        ),
-        TimeButtonWidget(
-          label: 'Monthly',
-          index: 3,
-          selectedTabIndex: selectedTabIndex,
-          onPressed: () => _onTimeButtonTapped(3),
-        ),
+        const SizedBox(height: 16), // Adds spacing between rows
       ],
+    );
+  }
+
+  /// Builds an individual TimeButtonWidget.
+  Widget _buildTimeButton(String label, int index) {
+    return TimeButtonWidget(
+      label: label,
+      index: index,
+      selectedTabIndex: selectedTabIndex,
+      onPressed: () => _handleTimeButtonTapped(index),
     );
   }
 }
