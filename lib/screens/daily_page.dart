@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:Emon/widgets/time_buttons.dart';
-import 'package:Emon/screens/daily_page_testmode.dart';
 
 class DailyPage extends StatefulWidget {
   final int selectedTabIndex;
@@ -237,8 +236,35 @@ class _DailyPageState extends State<DailyPage> {
         },
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
-          _buildTableHeaderRow(),
-          _buildTableDataRow('Date & Time', data['dateTime']),
+          TableRow(
+            decoration:
+                BoxDecoration(color: const Color.fromARGB(255, 147, 190, 142)),
+            children: const [
+              Padding(
+                padding: EdgeInsets.all(6.0),
+                child: Text(
+                  'Variables',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color.fromARGB(255, 32, 32, 32), // Dark green text
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(6.0),
+                child: Text(
+                  'Values',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color.fromARGB(255, 32, 32, 32), // Dark green text
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ), // Orange header row for real-time card
+          _buildTableDataRow('Date & Time', data['dateTime'].toString()),
           _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
           _buildTableDataRowWithIcon(
             'Description',
@@ -251,7 +277,111 @@ class _DailyPageState extends State<DailyPage> {
     );
   }
 
-  /// Builds a data row with an icon and description (for description with icon).
+  /// Builds the historical energy data list.
+  Widget _buildEnergyDataList() {
+    return Expanded(
+      child: ListView.builder(
+        itemCount: _historicalData.length,
+        itemBuilder: (context, index) {
+          return _buildHistoricalEnergyDataCard(_historicalData[index]);
+        },
+      ),
+    );
+  }
+
+  /// Builds the historical energy data table card with a dark green header row.
+  Widget _buildHistoricalEnergyDataCard(Map<String, dynamic> data) {
+    final statusColor = data['description'] == 'Low Energy Consumption'
+        ? Colors.green
+        : Colors.orange;
+    final statusIcon = data['description'] == 'Low Energy Consumption'
+        ? Icons.check_circle_outline
+        : Icons.warning_amber_outlined;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5.0),
+      ),
+      child: Table(
+        border: TableBorder.all(
+          color: const Color.fromARGB(255, 54, 83, 56),
+          width: 0.5,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(0.8),
+          1: FlexColumnWidth(1.4),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          _buildTableHeaderRow(const Color.fromARGB(255, 54, 83, 56)),
+          _buildTableDataRow('Date & Time', data['dateTime'].toString()),
+          _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
+          _buildTableDataRowWithIcon(
+            'Description',
+            data['description'],
+            statusIcon,
+            statusColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Helper method to build header rows with a configurable background color.
+  TableRow _buildTableHeaderRow(Color backgroundColor) {
+    return TableRow(
+      decoration: BoxDecoration(color: backgroundColor),
+      children: const [
+        Padding(
+          padding: EdgeInsets.all(6.0),
+          child: Text(
+            'Variables',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.all(6.0),
+          child: Text(
+            'Values',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Helper method to build rows for the table.
+  TableRow _buildTableDataRow(String label, String value) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+
   TableRow _buildTableDataRowWithIcon(
       String label, String value, IconData icon, Color color) {
     return TableRow(
@@ -301,62 +431,6 @@ class _DailyPageState extends State<DailyPage> {
           ),
         ],
       ),
-    );
-  }
-
-  /// Builds the historical energy data list.
-  Widget _buildEnergyDataList() {
-    return Expanded(
-      child: ListView.builder(
-        itemCount: _historicalData.length,
-        itemBuilder: (context, index) {
-          return _buildDailyEnergyDataCard(_historicalData[index]);
-        },
-      ),
-    );
-  }
-
-  /// Helper method to build rows for the table.
-  TableRow _buildTableHeaderRow() {
-    return const TableRow(
-      decoration: BoxDecoration(color: Color.fromARGB(255, 54, 83, 56)),
-      children: [
-        Padding(
-          padding: EdgeInsets.all(6.0),
-          child: Text(
-            'Variables',
-            style: TextStyle(fontSize: 12, color: Colors.white),
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.all(6.0),
-          child: Text(
-            'Values',
-            style: TextStyle(fontSize: 12, color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-
-  TableRow _buildTableDataRow(String label, String value) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 11),
-          ),
-        ),
-      ],
     );
   }
 }

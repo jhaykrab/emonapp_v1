@@ -256,7 +256,7 @@ class _DailyPageTestModeState extends State<DailyPageTestMode> {
     final statusColor = data['description'] == 'Low Energy Consumption'
         ? Colors.green
         : Colors.orange;
-    final statusIcon = data['description'] == 'Low Energy Consumption'
+    final statusIcon = data['description'] == 'Average Energy Consumption'
         ? Icons.check_circle_outline
         : Icons.warning_amber_outlined;
 

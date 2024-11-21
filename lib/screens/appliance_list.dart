@@ -646,7 +646,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                                                     const SizedBox(height: 6),
                                                     // Sensor readings
                                                     Text(
-                                                      'Energy: ${data['energy'].toStringAsFixed(2)} kWh',
+                                                      'Energy: ${data['energy'].toStringAsFixed(3)} kWh',
                                                       style: const TextStyle(
                                                           fontSize: 11),
                                                     ),

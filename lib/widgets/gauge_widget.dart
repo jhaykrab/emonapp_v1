@@ -1,4 +1,3 @@
-// gauge_widget.dart
 import 'dart:async'; // Import StreamSubscription
 import 'package:flutter/material.dart';
 import 'package:gauge_indicator/gauge_indicator.dart';
@@ -15,6 +14,7 @@ class GaugeWidget extends StatefulWidget {
 class _GaugeWidgetState extends State<GaugeWidget> {
   double _totalEnergy = 0.0;
   bool _isLoading = true;
+  bool _isResetEnabled = true; // Controls Reset button state
   late StreamSubscription<DatabaseEvent> _energySubscription; // Subscription
 
   @override
@@ -42,23 +42,27 @@ class _GaugeWidgetState extends State<GaugeWidget> {
         ];
 
         _energySubscription = dbRef.onValue.listen((DatabaseEvent event) async {
-          // onValue listener
           double totalEnergy = 0;
           for (final path in paths) {
-            final snapshot =
-                await dbRef.child(path).get(); //Must await inside the loop.
+            final snapshot = await dbRef.child(path).get();
 
             if (snapshot.exists) {
               final data = snapshot.value as Map<dynamic, dynamic>;
 
               if (data['uid'] == user.uid) {
                 totalEnergy += (data['energy'] ?? 0.0).toDouble();
+
+                // Check resetEnergy to toggle button state
+                bool resetEnergy = data['resetEnergy'] ?? false;
+                setState(() {
+                  _isResetEnabled =
+                      !resetEnergy; // Reset button enabled if resetEnergy is false
+                });
               }
             }
           }
 
           if (mounted) {
-            // Check if the widget is still mounted
             setState(() {
               _totalEnergy = totalEnergy;
               _isLoading = false;
@@ -127,7 +131,7 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${_totalEnergy.toStringAsFixed(2)}', // Display total energy
+                          '${_totalEnergy.toStringAsFixed(3)}', // Display total energy
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
@@ -245,7 +249,7 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
-                // Removed the label for 8
+                const SizedBox(height: 10),
               ],
             ),
     );
