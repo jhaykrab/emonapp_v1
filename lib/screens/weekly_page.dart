@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' as intl;
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:intl/intl.dart';
 import 'package:Emon/widgets/time_buttons.dart';
 
 class WeeklyPage extends StatefulWidget {
@@ -26,15 +24,15 @@ class WeeklyPage extends StatefulWidget {
 }
 
 class _WeeklyPageState extends State<WeeklyPage> {
-  double _totalEnergy = 0.0;
+  double _currentWeekEnergy = 0.0;
   late Timer _updateTimer;
-  late Timer _dataTimer;
-  late Timer _timeUpdateTimer;
-  bool _isSendingData = false;
-  List<Map<String, dynamic>> _historicalData = [];
+  List<Map<String, dynamic>> _historicalWeeklyData = [];
 
-  Map<String, dynamic> _currentEnergyData = {
-    'dateTime': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+  Map<String, dynamic> _currentWeekData = {
+    'currentDate': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+    'startDate': DateFormat('yyyy-MM-dd').format(
+        DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1))),
+    'endDate': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
     'totalEnergy': 0.0,
     'description': 'Initializing...',
   };
@@ -42,306 +40,242 @@ class _WeeklyPageState extends State<WeeklyPage> {
   @override
   void initState() {
     super.initState();
-    _loadRealTimeData();
-    _startWeeklyDataSending();
-    _loadHistoricalData();
+    _loadRealTimeEnergy();
     _startDateTimeUpdater();
+    _loadHistoricalWeeklyData();
   }
 
   @override
   void dispose() {
     _updateTimer.cancel();
-    if (_isSendingData) {
-      _dataTimer.cancel();
-    }
-    _timeUpdateTimer.cancel();
     super.dispose();
   }
 
+  /// Updates the current date and time every second.
   void _startDateTimeUpdater() {
-    _timeUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
-        _currentEnergyData['dateTime'] =
+        _currentWeekData['currentDate'] =
             DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
       });
     });
   }
 
-  void _loadRealTimeData() {
+  void _loadRealTimeEnergy() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final dbRef = FirebaseDatabase.instance.ref();
-    const paths = ['SensorReadings', 'SensorReadings_2', 'SensorReadings_3'];
-
-    dbRef.child('/').onValue.listen((event) {
-      final allData = event.snapshot.value as Map<dynamic, dynamic>?;
-
-      if (allData != null) {
-        double totalEnergy = 0.0;
-
-        for (var path in paths) {
-          final sensorData = allData[path] as Map<dynamic, dynamic>?;
-
-          if (sensorData != null && sensorData['uid'] == user.uid) {
-            totalEnergy += (sensorData['energy'] ?? 0.0).toDouble();
-          }
-        }
-
-        final status = _getEnergyStatus(totalEnergy);
-        final statusColor = _getStatusColor(status);
-        final statusIcon = _getStatusIcon(status);
-
-        if (mounted) {
-          // Check if the widget is still mounted
-          setState(() {
-            _totalEnergy = totalEnergy;
-            _currentEnergyData = {
-              'dateTime':
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'totalEnergy': _totalEnergy,
-              'description': status,
-              'statusColor': statusColor,
-              'statusIcon': statusIcon,
-            };
-          });
-        }
-      }
-    });
-  }
-
-// Function to determine the energy status description based on the energy value
-  String _getEnergyStatus(double energy) {
-    if (energy == 0) {
-      return 'No Energy Consumption yet for this week';
-    } else if (energy <= 16.33) {
-      return 'Low Energy Consumption';
-    } else if (energy <= 32.67) {
-      return 'Moderate Energy Consumption';
-    } else {
-      return 'High Energy Consumption';
-    }
-  }
-
-// Function to return the corresponding color based on the energy status
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'No Energy Consumption yet for this week':
-        return Colors.grey; // Grey for no consumption
-      case 'Low Energy Consumption':
-        return Colors.green; // Green for low consumption
-      case 'Moderate Energy Consumption':
-        return Colors.orange; // Orange for moderate consumption
-      case 'High Energy Consumption':
-        return Colors.red; // Red for high consumption
-      default:
-        return Colors.grey; // Default color for unknown status
-    }
-  }
-
-// Function to return the corresponding icon based on the energy status
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'No Energy Consumption yet for this week':
-        return Icons.power_off; // Icon for no energy consumption
-      case 'Low Energy Consumption':
-        return Icons.check_circle_outline; // Icon for low consumption
-      case 'Moderate Energy Consumption':
-        return Icons.warning_amber_outlined; // Icon for moderate consumption
-      case 'High Energy Consumption':
-        return Icons.error_outline; // Icon for high consumption
-      default:
-        return Icons.help_outline; // Default icon for unknown status
-    }
-  }
-
-  void _startWeeklyDataSending() {
-    if (_isSendingData) return;
-    _isSendingData = true;
-
-    void scheduleNextDataSend() {
-      final now = DateTime.now();
-      final nextSunday =
-          now.add(Duration(days: (7 - now.weekday) % 7)); // Next Sunday
-      final nextRunTime =
-          DateTime(nextSunday.year, nextSunday.month, nextSunday.day, 23, 59);
-
-      final durationUntilNextRun = nextRunTime.difference(now);
-
-      _dataTimer = Timer(durationUntilNextRun, () async {
-        await _sendWeeklyData();
-        if (_isSendingData) scheduleNextDataSend();
-      });
-    }
-
-    scheduleNextDataSend();
-  }
-
-  Future<void> _sendWeeklyData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final currentDateTime = DateTime.now();
-    final formattedDateTime =
-        intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
-
-    final data = <String, dynamic>{
-      'timestamp': currentDateTime,
-      'totalEnergy': _totalEnergy,
-      'description': _totalEnergy <= 49
-          ? 'Low Weekly Energy Consumption'
-          : _totalEnergy <= 98
-              ? 'Moderate Weekly Energy Consumption'
-              : 'High Weekly Energy Consumption',
-    };
+    // Calculate the start and end of the week dynamically
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // Monday
+    final endOfWeek = now; // Current moment as end of the week for real-time
 
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('historical_data_weekly')
-          .doc(formattedDateTime)
-          .set(data, SetOptions(merge: true));
-
-      _loadHistoricalData();
-    } catch (e) {
-      debugPrint('Error sending weekly data: $e');
-    }
-  }
-
-  Future<void> _loadHistoricalData() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .collection('historical_data_weekly')
+          .collection('historical_data')
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+          .where('timestamp',
+              isLessThanOrEqualTo: Timestamp.fromDate(endOfWeek))
           .get();
 
-      if (snapshot.docs.isNotEmpty) {
-        final loadedData = snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['dateTime'] = doc.id;
-          return data;
-        }).toList();
+      double totalEnergyFromWeek = 0.0;
 
-        if (mounted) {
-          // Check if the widget is still mounted
-          setState(() => _historicalData = loadedData);
-        }
+      for (var doc in snapshot.docs) {
+        final dailyEnergy = (doc['totalEnergy'] ?? 0.0).toDouble();
+        totalEnergyFromWeek += dailyEnergy;
       }
+
+      // Set description based on total energy
+      String energyDescription;
+      if (totalEnergyFromWeek <= 50.0) {
+        energyDescription = 'Low Weekly Energy Consumption';
+      } else if (totalEnergyFromWeek > 50.0 && totalEnergyFromWeek <= 150.0) {
+        energyDescription = 'Moderate Weekly Energy Consumption';
+      } else {
+        energyDescription = 'High Weekly Energy Consumption';
+      }
+
+      setState(() {
+        _currentWeekEnergy = totalEnergyFromWeek;
+        _currentWeekData = {
+          'currentDate': DateFormat('yyyy-MM-dd HH:mm:ss').format(now),
+          'startDate': DateFormat('yyyy-MM-dd').format(startOfWeek),
+          'endDate': DateFormat('yyyy-MM-dd HH:mm:ss').format(endOfWeek),
+          'totalEnergy': _currentWeekEnergy,
+          'description': energyDescription,
+        };
+      });
     } catch (e) {
-      debugPrint('Error loading historical data: $e');
+      debugPrint('Error loading real-time energy: $e');
     }
   }
 
-  TableRow _buildTableDataRowWithWeekRange() {
-    final now = DateTime.now();
-    final startOfWeek =
-        now.subtract(Duration(days: now.weekday - 1)); // Start of this week
-    final endOfWeek = startOfWeek.add(Duration(days: 6)); // End of this week
+  /// Loads historical weekly data from Firestore.
+  Future<void> _loadHistoricalWeeklyData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    // Format the start and end dates
-    final startFormatted = DateFormat('EEEE, MMM d, yyyy').format(startOfWeek);
-    final endFormatted = DateFormat('EEEE, MMM d, yyyy').format(endOfWeek);
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('weekly_historical_data')
+          .get();
 
-    // Get the week number in the month
-    final weekNumber = ((now.day - 1) ~/ 7) + 1;
-    final weekOfMonth =
-        "$weekNumber${_getOrdinalSuffix(weekNumber)} Week of ${DateFormat('MMMM').format(now)}";
+      final loadedData = snapshot.docs.map((doc) {
+        return {
+          'startDate': doc['startDate'],
+          'endDate': doc['endDate'],
+          'totalEnergy': doc['totalEnergy'],
+          'description': doc['description'],
+        };
+      }).toList();
 
+      setState(() {
+        _historicalWeeklyData = loadedData;
+      });
+    } catch (e) {
+      debugPrint('Error loading weekly historical data: $e');
+    }
+  }
+
+  Widget _buildWeeklyEnergyDataCard(Map<String, dynamic> data,
+      {bool isCurrent = false}) {
+    final statusColor = data['description'] == 'Low Weekly Energy Consumption'
+        ? Colors.green
+        : data['description'] == 'Moderate Weekly Energy Consumption'
+            ? Colors.orange
+            : Colors.red;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5.0),
+      ),
+      child: Table(
+        border: TableBorder.all(
+          color: const Color.fromARGB(255, 54, 83, 56),
+          width: 0.5,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(0.8),
+          1: FlexColumnWidth(1.4),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          TableRow(
+            decoration:
+                BoxDecoration(color: const Color.fromARGB(255, 147, 190, 142)),
+            children: const [
+              Padding(
+                padding: EdgeInsets.all(6.0),
+                child: Text(
+                  'Variables',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color.fromARGB(255, 32, 32, 32), // Dark green text
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(6.0),
+                child: Text(
+                  'Values',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color.fromARGB(255, 32, 32, 32), // Dark green text
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          _buildTableDataRow('Current Date', data['currentDate']),
+          _buildTableDataRow('Start Date', data['startDate']),
+          _buildTableDataRow('End Date', data['endDate']),
+          _buildTableDataRow(
+              'Total Energy', '${data['totalEnergy'].toStringAsFixed(2)} kWh'),
+          _buildTableDataRowWithIcon('Description', data['description'],
+              Icons.info_outline, statusColor),
+        ],
+      ),
+    );
+  }
+
+  TableRow _buildTableHeaderRow(Color backgroundColor) {
     return TableRow(
-      children: [
+      decoration: BoxDecoration(color: backgroundColor),
+      children: const [
         Padding(
-          padding: const EdgeInsets.all(6.0),
+          padding: EdgeInsets.all(6.0),
           child: Text(
-            'Date Started:',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+            'Variables',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(6.0),
+          padding: EdgeInsets.all(6.0),
           child: Text(
-            startFormatted,
-            style: const TextStyle(fontSize: 11),
+            'Values',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
     );
   }
 
-  TableRow _buildTableDataRowWithWeekEnd() {
-    final now = DateTime.now();
-    final startOfWeek =
-        now.subtract(Duration(days: now.weekday - 1)); // Start of this week
-    final endOfWeek = startOfWeek.add(Duration(days: 6)); // End of this week
-
-    // Format the start and end dates
-    final startFormatted = DateFormat('EEEE, MMM d, yyyy').format(startOfWeek);
-    final endFormatted = DateFormat('EEEE, MMM d, yyyy').format(endOfWeek);
-
+  TableRow _buildTableDataRow(String label, String value) {
     return TableRow(
       children: [
         Padding(
           padding: const EdgeInsets.all(6.0),
-          child: Text(
-            'Date Ends in:',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          ),
+          child: Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
         ),
         Padding(
           padding: const EdgeInsets.all(6.0),
-          child: Text(
-            endFormatted,
-            style: const TextStyle(fontSize: 11),
-          ),
+          child: Text(value, style: const TextStyle(fontSize: 11)),
         ),
       ],
     );
   }
 
-  TableRow _buildTableDataRowWithWeekDescription() {
-    final now = DateTime.now();
-    final weekNumber = ((now.day - 1) ~/ 7) + 1;
-    final weekOfMonth =
-        "$weekNumber${_getOrdinalSuffix(weekNumber)} Week of ${DateFormat('MMMM').format(now)} - current";
-
+  TableRow _buildTableDataRowWithIcon(
+      String label, String value, IconData icon, Color color) {
     return TableRow(
       children: [
         Padding(
           padding: const EdgeInsets.all(6.0),
-          child: Text(
-            'Week of the Month:',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          ),
+          child: Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
         ),
         Padding(
           padding: const EdgeInsets.all(6.0),
-          child: Text(
-            weekOfMonth,
-            style: const TextStyle(fontSize: 11),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 5),
+              Text(value, style: TextStyle(fontSize: 11, color: color)),
+            ],
           ),
         ),
       ],
     );
-  }
-
-  String _getOrdinalSuffix(int number) {
-    if (number >= 11 && number <= 13) {
-      return 'th';
-    }
-    switch (number % 10) {
-      case 1:
-        return 'st';
-      case 2:
-        return 'nd';
-      case 3:
-        return 'rd';
-      default:
-        return 'th';
-    }
   }
 
   @override
@@ -359,14 +293,26 @@ class _WeeklyPageState extends State<WeeklyPage> {
             onTimeButtonTapped: widget.onTimeButtonTapped,
           ),
           const SizedBox(height: 20),
-          _buildWeeklyEnergyDataCard(_currentEnergyData),
+
+          // Current Week Data
+          _buildWeeklyEnergyDataCard(_currentWeekData, isCurrent: true),
           const SizedBox(height: 30),
-          _buildEnergyDataList(),
+
+          // Historical Weekly Data
+          Expanded(
+            child: ListView.builder(
+              itemCount: _historicalWeeklyData.length,
+              itemBuilder: (context, index) {
+                return _buildWeeklyEnergyDataCard(_historicalWeeklyData[index]);
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
+  /// Builds the header for the Daily Consumption section.
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -391,134 +337,6 @@ class _WeeklyPageState extends State<WeeklyPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildWeeklyEnergyDataCard(Map<String, dynamic> data) {
-    final status = data['description'];
-    final statusColor =
-        _getStatusColor(status); // Get the color based on the status
-    final statusIcon =
-        _getStatusIcon(status); // Get the icon based on the status
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5.0),
-      ),
-      child: Table(
-        border: TableBorder.all(
-          color: const Color.fromARGB(255, 54, 83, 56),
-          width: 0.5,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        columnWidths: const {
-          0: FlexColumnWidth(0.8),
-          1: FlexColumnWidth(1.4),
-        },
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: [
-          _buildTableHeaderRow(),
-          _buildTableDataRowWithWeekRange(),
-          _buildTableDataRowWithWeekEnd(),
-          _buildTableDataRowWithWeekDescription(),
-          _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
-          _buildTableDataRowWithIcon(
-            'Description',
-            status,
-            statusIcon,
-            statusColor,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEnergyDataList() {
-    return Expanded(
-      child: ListView.builder(
-        itemCount: _historicalData.length,
-        itemBuilder: (context, index) {
-          return _buildWeeklyEnergyDataCard(_historicalData[index]);
-        },
-      ),
-    );
-  }
-
-  TableRow _buildTableHeaderRow() {
-    return TableRow(
-      decoration:
-          const BoxDecoration(color: const Color.fromARGB(255, 54, 83, 56)),
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(6.0),
-          child: Text(
-            'Variables',
-            style: TextStyle(
-                fontWeight: FontWeight.normal,
-                fontSize: 12,
-                color: Colors.white),
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.all(6.0),
-          child: Text(
-            'Values',
-            style: TextStyle(
-                fontWeight: FontWeight.normal,
-                fontSize: 12,
-                color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-
-  TableRow _buildTableDataRow(String label, String value) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 11),
-          ),
-        ),
-      ],
-    );
-  }
-
-  TableRow _buildTableDataRowWithIcon(
-      String label, String value, IconData icon, Color color) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Text(label,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(6.0),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: color), // Icon color based on status
-              const SizedBox(width: 5),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: color)), // Text color based on status
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
