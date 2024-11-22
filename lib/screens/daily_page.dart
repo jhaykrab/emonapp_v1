@@ -247,7 +247,7 @@ class _DailyPageState extends State<DailyPage> {
                   style: TextStyle(
                     fontSize: 12,
                     color: Color.fromARGB(255, 32, 32, 32), // Dark green text
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ),
@@ -258,7 +258,7 @@ class _DailyPageState extends State<DailyPage> {
                   style: TextStyle(
                     fontSize: 12,
                     color: Color.fromARGB(255, 32, 32, 32), // Dark green text
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ),
@@ -341,7 +341,7 @@ class _DailyPageState extends State<DailyPage> {
             style: TextStyle(
               fontSize: 12,
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.normal,
             ),
           ),
         ),
@@ -352,7 +352,7 @@ class _DailyPageState extends State<DailyPage> {
             style: TextStyle(
               fontSize: 12,
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.normal,
             ),
           ),
         ),
