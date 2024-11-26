@@ -8,7 +8,7 @@ import 'package:Emon/widgets/time_button_widget.dart';
 import 'package:Emon/widgets/device_info_widget.dart';
 import 'package:Emon/widgets/app_bar_widget.dart';
 import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
-import 'package:Emon/screens/analytics_screen.dart';
+import 'package:Emon/screens/history_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Emon/models/appliance.dart';
 import 'package:Emon/constants.dart';

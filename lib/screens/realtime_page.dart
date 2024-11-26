@@ -1,4 +1,3 @@
-// realtime_page.dart
 import 'package:flutter/material.dart';
 import 'package:Emon/widgets/gauge_widget.dart';
 import 'package:Emon/widgets/device_info_widget.dart';
@@ -32,6 +31,7 @@ class RealTimePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Title Section: Realtime Consumption
           const SizedBox(height: 25),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -50,16 +50,22 @@ class RealTimePage extends StatelessWidget {
                     color:
                         Color.fromARGB(255, 231, 175, 22)), // Icon with color
                 SizedBox(width: 8),
-                Text("Realtime Consumption",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(
-                            255, 54, 83, 56))), // Text with color
+                Text(
+                  "Realtime Consumption",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color:
+                          Color.fromARGB(255, 54, 83, 56)), // Text with color
+                ),
               ],
             ),
           ),
+
+          // Gauge Widget displaying consumption stats
           const SizedBox(height: 50),
           const GaugeWidget(),
+
+          // Time Buttons for selecting time ranges (Daily, Weekly, etc.)
           const SizedBox(height: 20),
           TimeButtons(
             pageController: pageController, // Pass the received pageController
@@ -67,10 +73,14 @@ class RealTimePage extends StatelessWidget {
             setSelectedTabIndex: setSelectedTabIndex,
             onTimeButtonTapped: onTimeButtonTapped, // Pass the callback
           ),
+
+          // Device info section: List of appliances with add functionality
           DeviceInfoWidget(
             appliances: applianceProvider.appliances,
             onAddAppliance: applianceProvider.addAppliance,
           ),
+
+          // Optional spacing at the bottom
           const SizedBox(height: 30),
         ],
       ),
