@@ -90,22 +90,26 @@ class _MonthlyPageState extends State<MonthlyPage> {
         totalEnergyFromMonth += dailyEnergy;
       }
 
-      String energyDescription = '';
-      Color statusColor = Colors.grey;
+      // Determine description and color based on energy ranges
+      String energyDescription;
+      Color statusColor;
 
-      if (totalEnergyFromMonth == 0.0) {
-        energyDescription = 'No Monthly Energy Consumption';
+      if (totalEnergyFromMonth == 0) {
+        energyDescription = 'No Energy Consumption';
         statusColor = Colors.grey;
-      } else if (totalEnergyFromMonth > 0.0 && totalEnergyFromMonth <= 70.0) {
+      } else if (totalEnergyFromMonth > 0 && totalEnergyFromMonth <= 52.75) {
         energyDescription = 'Low Energy Consumption';
         statusColor = Colors.green;
-      } else if (totalEnergyFromMonth > 70.0 && totalEnergyFromMonth <= 141.0) {
-        energyDescription = 'Moderate Energy Consumption';
+      } else if (totalEnergyFromMonth > 52.75 &&
+          totalEnergyFromMonth <= 158.25) {
+        energyDescription = 'Medium Energy Consumption';
         statusColor = Colors.orange;
-      } else if (totalEnergyFromMonth > 141.0 &&
-          totalEnergyFromMonth <= 211.0) {
+      } else if (totalEnergyFromMonth > 158.25 && totalEnergyFromMonth <= 211) {
         energyDescription = 'High Energy Consumption';
         statusColor = Colors.red;
+      } else {
+        energyDescription = 'Above Monthly Limit';
+        statusColor = Colors.purple; // Optional for extreme values
       }
 
       if (mounted) {
@@ -121,21 +125,6 @@ class _MonthlyPageState extends State<MonthlyPage> {
             'description': energyDescription,
             'statusColor': statusColor,
           };
-        });
-      }
-
-      // Save to Firestore if the month ends
-      if (now.isAfter(endOfMonth)) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('monthly_historical_data')
-            .doc(DateFormat('yyyy-MM').format(now))
-            .set({
-          'Date Started': startOfMonth,
-          'Date Ended': endOfMonth,
-          'Total Energy': _currentMonthEnergy,
-          'Description': energyDescription,
         });
       }
     } catch (e) {
@@ -161,21 +150,25 @@ class _MonthlyPageState extends State<MonthlyPage> {
             (doc['Date Ended'] as Timestamp?)?.toDate() ?? DateTime.now();
         final totalEnergy = (doc['Total Energy'] ?? 0.0).toDouble();
 
-        String energyDescription = '';
-        Color statusColor = Colors.grey;
+        // Apply thresholds for description and color
+        String energyDescription;
+        Color statusColor;
 
-        if (totalEnergy == 0.0) {
-          energyDescription = 'No Monthly Energy Consumption';
+        if (totalEnergy == 0) {
+          energyDescription = 'No Energy Consumption';
           statusColor = Colors.grey;
-        } else if (totalEnergy > 0.0 && totalEnergy <= 70.0) {
+        } else if (totalEnergy > 0 && totalEnergy <= 52.75) {
           energyDescription = 'Low Energy Consumption';
           statusColor = Colors.green;
-        } else if (totalEnergy > 70.0 && totalEnergy <= 141.0) {
-          energyDescription = 'Moderate Energy Consumption';
+        } else if (totalEnergy > 52.75 && totalEnergy <= 158.25) {
+          energyDescription = 'Medium Energy Consumption';
           statusColor = Colors.orange;
-        } else if (totalEnergy > 141.0 && totalEnergy <= 211.0) {
+        } else if (totalEnergy > 158.25 && totalEnergy <= 211) {
           energyDescription = 'High Energy Consumption';
           statusColor = Colors.red;
+        } else {
+          energyDescription = 'Above Monthly Limit';
+          statusColor = Colors.purple;
         }
 
         return {
@@ -199,13 +192,9 @@ class _MonthlyPageState extends State<MonthlyPage> {
 
   Widget _buildMonthlyDataTable(Map<String, dynamic> data,
       {bool isCurrent = false}) {
-    final statusColor = data['description'] == 'Low Monthly Energy Consumption'
-        ? Colors.green
-        : data['description'] == 'Moderate Monthly Energy Consumption'
-            ? Colors.orange
-            : data['description'] == 'High Monthly Energy Consumption'
-                ? Colors.red
-                : Colors.grey;
+    final statusColor = data['statusColor'] as Color? ?? Colors.grey;
+    final description = data['description'] ?? 'N/A';
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
       child: Table(
@@ -214,17 +203,15 @@ class _MonthlyPageState extends State<MonthlyPage> {
           width: 0.5,
         ),
         columnWidths: const {
-          0: FlexColumnWidth(0.8), // Adjusted for better spacing
+          0: FlexColumnWidth(0.8),
           1: FlexColumnWidth(1.4),
         },
         children: [
           TableRow(
             decoration: BoxDecoration(
               color: isCurrent
-                  ? const Color.fromARGB(
-                      255, 147, 190, 142) // Light green for current table
-                  : const Color.fromARGB(
-                      255, 54, 83, 56), // Dark green for historical data
+                  ? const Color.fromARGB(255, 147, 190, 142) // Light green
+                  : const Color.fromARGB(255, 54, 83, 56), // Dark green
             ),
             children: [
               Padding(
@@ -232,11 +219,11 @@ class _MonthlyPageState extends State<MonthlyPage> {
                 child: Text(
                   "Variables",
                   style: TextStyle(
-                    fontSize: 12, // Reduced font size for mobile
+                    fontSize: 12,
                     color: isCurrent
                         ? const Color.fromARGB(255, 32, 32, 32)
                         : Colors.white,
-                    fontWeight: FontWeight.normal, // Make the headers bold
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ),
@@ -245,11 +232,11 @@ class _MonthlyPageState extends State<MonthlyPage> {
                 child: Text(
                   "Values",
                   style: TextStyle(
-                    fontSize: 12, // Reduced font size for mobile
+                    fontSize: 12,
                     color: isCurrent
                         ? const Color.fromARGB(255, 32, 32, 32)
                         : Colors.white,
-                    fontWeight: FontWeight.normal, // Make the headers bold
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ),
@@ -261,10 +248,11 @@ class _MonthlyPageState extends State<MonthlyPage> {
           _buildTableDataRow('Total Energy',
               '${(data['totalEnergy'] ?? 0.0).toStringAsFixed(2)} kWh'),
           _buildTableDataRowWithIcon(
-              'Description',
-              data['description'] ?? 'N/A',
-              Icons.check_circle_outline,
-              statusColor),
+            'Description',
+            description,
+            Icons.bolt,
+            statusColor,
+          ),
         ],
       ),
     );

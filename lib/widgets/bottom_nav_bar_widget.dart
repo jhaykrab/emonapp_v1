@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:Emon/screens/history_screen.dart';
+import 'package:Emon/screens/analytics_screen.dart';
 import 'package:Emon/screens/dashboard_screen.dart';
 import 'package:Emon/screens/appliance_list.dart';
 
@@ -135,7 +135,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HistoryScreen(),
+                  builder: (context) => AnalyticsScreen(),
                 ),
               );
             } else if (index == 1) {

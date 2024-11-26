@@ -26,6 +26,7 @@ class WeeklyPage extends StatefulWidget {
 class _WeeklyPageState extends State<WeeklyPage> {
   double _currentWeekEnergy = 0.0;
   late Timer _updateTimer;
+  String? _lastSentWeekId; // Tracks the last sent week's ID
   List<Map<String, dynamic>> _historicalWeeklyData = [];
 
   Map<String, dynamic> _currentWeekData = {
@@ -47,12 +48,69 @@ class _WeeklyPageState extends State<WeeklyPage> {
     _loadRealTimeEnergy();
     _startDateTimeUpdater();
     _loadHistoricalWeeklyData();
+    _startWeeklyDataScheduler(); // Schedule weekly data submission
   }
 
   @override
   void dispose() {
     _updateTimer.cancel();
     super.dispose();
+  }
+
+  void _startWeeklyDataScheduler() {
+    Timer.periodic(const Duration(minutes: 1), (timer) async {
+      final now = DateTime.now();
+
+      // Check if it's Sunday at 11:59 PM
+      if (now.weekday == DateTime.sunday &&
+          now.hour == 23 &&
+          now.minute == 59) {
+        await _sendWeeklyDataToFirestore();
+      }
+    });
+  }
+
+  Future<void> _sendWeeklyDataToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Calculate start and end of the week
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // Monday
+    final endOfWeek = _calculateEndOfWeek(startOfWeek); // Sunday or Saturday
+
+    final weekId =
+        '${startOfWeek.toIso8601String()}_to_${endOfWeek.toIso8601String()}';
+
+    // Check if the data for this week has already been sent
+    if (_lastSentWeekId == weekId) {
+      debugPrint('Weekly data for week $weekId has already been sent.');
+      return;
+    }
+
+    final totalEnergy =
+        _currentWeekEnergy; // Use current week's calculated energy
+
+    final data = {
+      'Start Date': Timestamp.fromDate(startOfWeek),
+      'End Date': Timestamp.fromDate(endOfWeek),
+      'totalEnergy': totalEnergy,
+    };
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('weekly_historical_data')
+          .doc(weekId)
+          .set(data);
+      debugPrint('Weekly data sent successfully for week: $weekId');
+
+      // Update the tracker after successful save
+      _lastSentWeekId = weekId;
+    } catch (e) {
+      debugPrint('Error sending weekly data: $e');
+    }
   }
 
   void _startDateTimeUpdater() {
@@ -69,8 +127,8 @@ class _WeeklyPageState extends State<WeeklyPage> {
     if (user == null) return;
 
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = now;
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // Monday
+    final endOfWeek = _calculateEndOfWeek(startOfWeek); // Sunday or Saturday
 
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -90,22 +148,25 @@ class _WeeklyPageState extends State<WeeklyPage> {
         totalEnergyFromWeek += dailyEnergy;
       }
 
-      String energyDescription = '';
-      Color statusColor = Colors.grey;
+      // Determine description and color based on energy ranges
+      String energyDescription;
+      Color statusColor;
 
-      // Update the conditions
-      if (totalEnergyFromWeek == 0.0) {
-        energyDescription = 'No Weekly Energy Consumption';
+      if (totalEnergyFromWeek == 0) {
+        energyDescription = 'No Energy Consumption';
         statusColor = Colors.grey;
-      } else if (totalEnergyFromWeek > 0.001 && totalEnergyFromWeek <= 16.33) {
-        energyDescription = 'Low Weekly Energy Consumption';
+      } else if (totalEnergyFromWeek > 0 && totalEnergyFromWeek <= 12) {
+        energyDescription = 'Low Energy Consumption';
         statusColor = Colors.green;
-      } else if (totalEnergyFromWeek > 16.33 && totalEnergyFromWeek <= 32.66) {
-        energyDescription = 'Moderate Weekly Energy Consumption';
+      } else if (totalEnergyFromWeek > 12 && totalEnergyFromWeek <= 25) {
+        energyDescription = 'Medium Energy Consumption';
         statusColor = Colors.orange;
-      } else if (totalEnergyFromWeek > 32.66 && totalEnergyFromWeek <= 49.0) {
-        energyDescription = 'High Weekly Energy Consumption';
+      } else if (totalEnergyFromWeek > 25 && totalEnergyFromWeek <= 49) {
+        energyDescription = 'High Energy Consumption';
         statusColor = Colors.red;
+      } else {
+        energyDescription = 'Above Weekly Limit';
+        statusColor = Colors.purple; // Optional for extreme values
       }
 
       if (mounted) {
@@ -142,26 +203,28 @@ class _WeeklyPageState extends State<WeeklyPage> {
       final loadedData = snapshot.docs.map((doc) {
         final startDate =
             (doc['Start Date'] as Timestamp?)?.toDate() ?? DateTime.now();
-        final endDate =
-            (doc['End Date'] as Timestamp?)?.toDate() ?? DateTime.now();
+        final endDate = _calculateEndOfWeek(startDate);
         final totalEnergy = (doc['totalEnergy'] ?? 0.0).toDouble();
 
-        // Dynamically determine description and statusColor
-        String energyDescription = '';
-        Color statusColor = Colors.grey;
+        // Apply energy range logic for description and color
+        String energyDescription;
+        Color statusColor;
 
-        if (totalEnergy == 0.0) {
-          energyDescription = 'No Weekly Energy Consumption';
+        if (totalEnergy == 0) {
+          energyDescription = 'No Energy Consumption';
           statusColor = Colors.grey;
-        } else if (totalEnergy > 0.0 && totalEnergy <= 16.33) {
+        } else if (totalEnergy > 0 && totalEnergy <= 12) {
           energyDescription = 'Low Energy Consumption';
           statusColor = Colors.green;
-        } else if (totalEnergy > 16.33 && totalEnergy <= 32.66) {
-          energyDescription = 'Moderate Energy Consumption';
+        } else if (totalEnergy > 12 && totalEnergy <= 25) {
+          energyDescription = 'Medium Energy Consumption';
           statusColor = Colors.orange;
-        } else if (totalEnergy > 32.66 && totalEnergy <= 49.0) {
+        } else if (totalEnergy > 25 && totalEnergy <= 49) {
           energyDescription = 'High Energy Consumption';
           statusColor = Colors.red;
+        } else {
+          energyDescription = 'Above Weekly Limit';
+          statusColor = Colors.purple; // Optional for extreme values
         }
 
         return {
@@ -169,7 +232,7 @@ class _WeeklyPageState extends State<WeeklyPage> {
           'endDate': DateFormat('yyyy-MM-dd').format(endDate).toString(),
           'totalEnergy': totalEnergy,
           'description': energyDescription,
-          'statusColor': statusColor, // Dynamically assigned
+          'statusColor': statusColor,
         };
       }).toList();
 
@@ -183,15 +246,17 @@ class _WeeklyPageState extends State<WeeklyPage> {
     }
   }
 
+  DateTime _calculateEndOfWeek(DateTime startOfWeek) {
+    // Sunday is day 7; fallback to Saturday (day 6) if no Sunday exists
+    final endOfWeek = startOfWeek.add(const Duration(days: 6)); // Saturday
+    final nextDay = endOfWeek.add(const Duration(days: 1)); // Potential Sunday
+    return nextDay.weekday == DateTime.sunday ? nextDay : endOfWeek;
+  }
+
   Widget _buildWeeklyEnergyDataCard(Map<String, dynamic> data,
       {bool isCurrent = false, bool isHistorical = false}) {
-    final statusColor = data['description'] == 'Low Weekly Energy Consumption'
-        ? Colors.green
-        : data['description'] == 'Moderate Weekly Energy Consumption'
-            ? Colors.orange
-            : data['description'] == 'High Weekly Energy Consumption'
-                ? Colors.red
-                : Colors.grey;
+    final statusColor = data['statusColor'] as Color? ?? Colors.grey;
+    final description = data['description'] ?? 'N/A';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
@@ -225,10 +290,11 @@ class _WeeklyPageState extends State<WeeklyPage> {
           _buildTableDataRow('Total Energy',
               '${(data['totalEnergy'] ?? 0.0).toStringAsFixed(2)} kWh'),
           _buildTableDataRowWithIcon(
-              'Description',
-              data['description'] ?? 'N/A',
-              Icons.check_circle_outline,
-              statusColor),
+            'Description',
+            description,
+            Icons.bolt,
+            statusColor,
+          ),
         ],
       ),
     );

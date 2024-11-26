@@ -4,7 +4,7 @@ import 'package:intl/intl.dart' as intl;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Local storage for tracking sent days
 import 'package:Emon/widgets/time_buttons.dart';
 
 class DailyPage extends StatefulWidget {
@@ -27,14 +27,12 @@ class DailyPage extends StatefulWidget {
 
 class _DailyPageState extends State<DailyPage> {
   double _totalEnergy = 0.0;
-  late Timer _updateTimer;
   late Timer _dataTimer;
-  late Timer _timeUpdateTimer;
   bool _isSendingData = false;
-  List<Map<String, dynamic>> _historicalData = [];
 
+  List<Map<String, dynamic>> _historicalData = [];
   Map<String, dynamic> _currentEnergyData = {
-    'dateTime': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+    'dateTime': intl.DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
     'totalEnergy': 0.0,
     'description': 'Initializing...',
   };
@@ -43,32 +41,157 @@ class _DailyPageState extends State<DailyPage> {
   void initState() {
     super.initState();
     _loadRealTimeData();
-    _startDailyDataSending();
+    _checkAndSendMissedDailyData(); // Handle missed data on app launch
+    _startDailyDataSending(); // Schedule data sending for 11:59 PM
     _loadHistoricalData();
     _startDateTimeUpdater();
   }
 
   @override
   void dispose() {
-    _updateTimer.cancel();
     if (_isSendingData) {
       _dataTimer.cancel();
     }
-    _timeUpdateTimer.cancel();
     super.dispose();
   }
 
-  /// Updates the current dateTime value every second.
+  /// Updates the current dateTime every second
   void _startDateTimeUpdater() {
-    _timeUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
         _currentEnergyData['dateTime'] =
-            DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+            intl.DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
       });
     });
   }
 
-  /// Loads real-time data from Firebase Realtime Database and sums the energy readings.
+  /// Checks for any missed days and sends data if needed
+  Future<void> _checkAndSendMissedDailyData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // If no data has been sent for today, send it now
+    if (!prefs.containsKey('lastSentDate') ||
+        prefs.getString('lastSentDate') != today) {
+      await _sendDailyData();
+    }
+  }
+
+  /// Schedules daily data sending at 11:59 PM
+  void _startDailyDataSending() {
+    if (_isSendingData) return;
+    _isSendingData = true;
+
+    void scheduleNextDataSend() {
+      final now = DateTime.now();
+      final nextRunTime = DateTime(now.year, now.month, now.day, 23, 59).add(
+        now.isAfter(DateTime(now.year, now.month, now.day, 23, 59))
+            ? const Duration(days: 1)
+            : Duration.zero,
+      );
+      final durationUntilNextRun = nextRunTime.difference(now);
+
+      _dataTimer = Timer(durationUntilNextRun, () async {
+        await _sendDailyData(); // Send daily data at 11:59 PM
+        if (_isSendingData) scheduleNextDataSend(); // Schedule the next run
+      });
+    }
+
+    scheduleNextDataSend();
+  }
+
+  /// Sends daily energy consumption data to Firestore
+  Future<void> _sendDailyData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final currentDateTime = DateTime.now();
+    final today =
+        intl.DateFormat('yyyy-MM-dd').format(currentDateTime); // Day-based ID
+    final data = <String, dynamic>{
+      'timestamp': currentDateTime,
+      'totalEnergy': _totalEnergy, // Will be 0 if the device is off
+      'description': _totalEnergy <= 1
+          ? 'Low Energy Consumption'
+          : 'Energy Usage Moderate to High',
+    };
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('historical_data')
+          .doc(today) // Use the date as the document ID
+          .set(data, SetOptions(merge: true));
+
+      debugPrint('Daily data sent successfully for: $today');
+
+      // Save the last sent date locally
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString('lastSentDate', today);
+
+      // Reload historical data after sending
+      await _loadHistoricalData();
+    } catch (e) {
+      debugPrint('Error sending daily data: $e');
+    }
+  }
+
+  /// Loads historical data from Firestore
+  Future<void> _loadHistoricalData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('historical_data')
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final loadedData = snapshot.docs.map((doc) {
+          final data = doc.data();
+          final totalEnergy = (data['totalEnergy'] ?? 0.0).toDouble();
+
+          // Apply thresholds for description and color
+          String description;
+          Color statusColor;
+
+          if (totalEnergy == 0) {
+            description = 'No Energy Consumption';
+            statusColor = Colors.grey;
+          } else if (totalEnergy > 0 && totalEnergy <= 2) {
+            description = 'Low Energy Consumption';
+            statusColor = Colors.green;
+          } else if (totalEnergy > 2 && totalEnergy <= 5) {
+            description = 'Moderate Energy Consumption';
+            statusColor = Colors.orange;
+          } else if (totalEnergy > 5 && totalEnergy <= 7) {
+            description = 'High Energy Consumption';
+            statusColor = Colors.red;
+          } else {
+            description = 'Above Daily Limit'; // Handle values above 7
+            statusColor = Colors.purple; // Optional for out-of-range values
+          }
+
+          return {
+            'dateTime': doc.id, // Use document ID as dateTime
+            'totalEnergy': totalEnergy,
+            'description': description,
+            'statusColor': statusColor,
+          };
+        }).toList();
+
+        if (mounted) {
+          setState(() => _historicalData = loadedData);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading historical data: $e');
+    }
+  }
+
   void _loadRealTimeData() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -90,101 +213,45 @@ class _DailyPageState extends State<DailyPage> {
           }
         }
 
-        setState(() {
-          _totalEnergy = totalEnergy;
-          _currentEnergyData = {
-            'dateTime':
-                DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-            'totalEnergy': _totalEnergy,
-            'description': _totalEnergy <= 1
-                ? 'Low Energy Consumption'
-                : 'Energy Usage Moderate to High',
-          };
-        });
-      }
-    });
-  }
+        // Determine description and color based on energy thresholds
+        String description;
+        Color statusColor;
 
-  /// Schedules daily data sending at 11:59 PM.
-  void _startDailyDataSending() {
-    if (_isSendingData) return;
-    _isSendingData = true;
-
-    void scheduleNextDataSend() {
-      final now = DateTime.now();
-      final nextRunTime = DateTime(now.year, now.month, now.day, 23, 59).add(
-        now.isAfter(DateTime(now.year, now.month, now.day, 23, 59))
-            ? const Duration(days: 1)
-            : Duration.zero,
-      );
-      final durationUntilNextRun = nextRunTime.difference(now);
-
-      _dataTimer = Timer(durationUntilNextRun, () async {
-        await _sendDailyData();
-        if (_isSendingData) scheduleNextDataSend();
-      });
-    }
-
-    scheduleNextDataSend();
-  }
-
-  /// Sends daily energy consumption data to Firestore.
-  Future<void> _sendDailyData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final currentDateTime = DateTime.now();
-    final formattedDateTime =
-        intl.DateFormat('yyyy-MM-dd_HH:mm:ss').format(currentDateTime);
-
-    final data = <String, dynamic>{
-      'timestamp': currentDateTime,
-      'totalEnergy': _totalEnergy,
-      'description': _totalEnergy <= 1
-          ? 'Low Energy Consumption'
-          : 'Energy Usage Moderate to High',
-    };
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('historical_data')
-          .doc(formattedDateTime)
-          .set(data, SetOptions(merge: true));
-
-      _loadHistoricalData();
-    } catch (e) {
-      debugPrint('Error sending daily data: $e');
-    }
-  }
-
-  /// Loads historical data from Firestore.
-  Future<void> _loadHistoricalData() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('historical_data')
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        final loadedData = snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['dateTime'] = doc.id;
-          return data;
-        }).toList();
+        if (totalEnergy == 0) {
+          description = 'No Energy Consumption';
+          statusColor = Colors.grey;
+        } else if (totalEnergy > 0 && totalEnergy <= 2) {
+          description = 'Low Energy Consumption';
+          statusColor = Colors.green;
+        } else if (totalEnergy > 2 && totalEnergy <= 5) {
+          description = 'Moderate Energy Consumption';
+          statusColor = Colors.orange;
+        } else if (totalEnergy > 5 && totalEnergy <= 7) {
+          description = 'High Energy Consumption';
+          statusColor = Colors.red;
+        } else {
+          description = 'Above Daily Limit'; // Handle cases > 7
+          statusColor = Colors.purple; // Optional: Add another color
+        }
 
         if (mounted) {
-          setState(() => _historicalData = loadedData);
+          setState(() {
+            _totalEnergy = totalEnergy;
+            _currentEnergyData = {
+              'dateTime':
+                  intl.DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'totalEnergy': _totalEnergy,
+              'description': description,
+              'statusColor': statusColor,
+            };
+          });
         }
+
+        debugPrint('Real-time total energy updated: $_totalEnergy');
+      } else {
+        debugPrint('No data found in Firebase Realtime Database.');
       }
-    } catch (e) {
-      debugPrint('Error loading historical data: $e');
-    }
+    });
   }
 
   @override
@@ -210,14 +277,9 @@ class _DailyPageState extends State<DailyPage> {
     );
   }
 
-  /// Builds the daily energy data table card.
   Widget _buildDailyEnergyDataCard(Map<String, dynamic> data) {
-    final statusColor = data['description'] == 'Low Energy Consumption'
-        ? Colors.green
-        : Colors.orange;
-    final statusIcon = data['description'] == 'Low Energy Consumption'
-        ? Icons.check_circle_outline
-        : Icons.warning_amber_outlined;
+    final statusColor = data['statusColor'] as Color? ?? Colors.grey;
+    final description = data['description'] ?? 'N/A';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
@@ -268,8 +330,8 @@ class _DailyPageState extends State<DailyPage> {
           _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
           _buildTableDataRowWithIcon(
             'Description',
-            data['description'],
-            statusIcon,
+            description,
+            Icons.bolt,
             statusColor,
           ),
         ],
@@ -291,12 +353,8 @@ class _DailyPageState extends State<DailyPage> {
 
   /// Builds the historical energy data table card with a dark green header row.
   Widget _buildHistoricalEnergyDataCard(Map<String, dynamic> data) {
-    final statusColor = data['description'] == 'Low Energy Consumption'
-        ? Colors.green
-        : Colors.orange;
-    final statusIcon = data['description'] == 'Low Energy Consumption'
-        ? Icons.check_circle_outline
-        : Icons.warning_amber_outlined;
+    final statusColor = data['statusColor'] as Color? ?? Colors.grey;
+    final description = data['description'] ?? 'N/A';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 14.0),
@@ -320,8 +378,8 @@ class _DailyPageState extends State<DailyPage> {
           _buildTableDataRow('Total Energy', '${data['totalEnergy']} kWh'),
           _buildTableDataRowWithIcon(
             'Description',
-            data['description'],
-            statusIcon,
+            description,
+            Icons.bolt,
             statusColor,
           ),
         ],
