@@ -475,7 +475,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
   Widget _buildApplianceListContainer(Widget child) {
     return Container(
       width: MediaQuery.of(context).size.width *
-          0.7, // Reduced container width (70%)
+          1.0, // Reduced container width (70%)
       padding: EdgeInsets.all(12.0),
       margin: EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
       decoration: BoxDecoration(
@@ -528,7 +528,7 @@ class _ApplianceListScreenState extends State<ApplianceListScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      "Appliances Realtime Sensor Readings",
+                      "Appliances Sensor Readings",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color:

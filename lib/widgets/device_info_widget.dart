@@ -90,108 +90,110 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
           int runtimeSeconds = data['runtimesec'] ?? 0;
 
           return _buildApplianceListContainer(
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+            LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                bool isSmallScreen = constraints.maxWidth < 600;
+                double iconSize = isSmallScreen ? 28 : 36;
+
+                return Wrap(
+                  spacing: 16.0,
+                  runSpacing: 8.0,
+                  alignment: WrapAlignment
+                      .center, // Center the Wrap content horizontally
+                  crossAxisAlignment: WrapCrossAlignment
+                      .center, // Center the children vertically
                   children: [
-                    Icon(
-                      appliance.icon,
-                      size: 32,
-                      color: const Color.fromARGB(255, 72, 100, 68),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.wifi,
-                      size: 18,
-                      color: isApplianceOn ? Colors.green : Colors.grey,
-                    ),
-                    const SizedBox(width: 12),
                     Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment
+                          .center, // Vertically center the icons
+                      crossAxisAlignment: CrossAxisAlignment
+                          .center, // Horizontally center the icons
                       children: [
-                        MouseRegion(
-                          onEnter: (_) => setState(() {}),
-                          onExit: (_) => setState(() {}),
-                          child: Tooltip(
-                            message: appliance.name,
-                            preferBelow: false,
-                            child: Text(
-                              appliance.name.length > maxNameLength
-                                  ? '${appliance.name.substring(0, maxNameLength)}...'
-                                  : appliance.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                        Icon(
+                          appliance.icon,
+                          size: iconSize,
+                          color: const Color.fromARGB(255, 72, 100, 68),
+                        ),
+                        SizedBox(height: isSmallScreen ? 4 : 8),
+                        Icon(
+                          Icons.wifi,
+                          size: isSmallScreen ? 16 : 20,
+                          color: isApplianceOn ? Colors.green : Colors.grey,
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start, // Align text to the start
+                      children: [
+                        Text(
+                          appliance.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: isSmallScreen ? 14 : 16,
                           ),
                         ),
                         Text(
                           'Serial No: ${appliance.serialNumber}',
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: isSmallScreen ? 10 : 12),
                         ),
-                        const SizedBox(height: 4),
                         Text(
                           isApplianceOn ? 'Device On' : 'Device Off',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: isSmallScreen ? 10 : 12,
                             color: isApplianceOn
                                 ? Colors.green
-                                : const Color.fromARGB(
-                                    255, 126, 125, 125), // Conditional color
+                                : const Color.fromARGB(255, 126, 125, 125),
                           ),
                         ),
                         Text(
-                          // Display runtime below Device On/Off
                           'Runtime: $runtimeHours h $runtimeMinutes m $runtimeSeconds s',
-                          style: const TextStyle(fontSize: 11),
+                          style: TextStyle(fontSize: isSmallScreen ? 10 : 11),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      children: [
-                        Transform.scale(
-                          scale: 0.75,
-                          child: Switch(
-                            value:
-                                isApplianceOn, // Use isApplianceOn from Realtime DB
-                            onChanged: (value) async {
-                              await applianceProvider.toggleAppliance(
-                                  appliance, value);
-                            },
-                            activeTrackColor: Colors.green[700],
-                            activeColor: Colors.green[900],
-                            inactiveTrackColor: Colors.grey[400],
-                            inactiveThumbColor: Colors.grey[300],
+                    IntrinsicWidth(
+                      // Switch and buttons
+                      child: Column(
+                        // Align the right column content to the end
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Transform.scale(
+                            scale: 0.75,
+                            child: Switch(
+                              value: isApplianceOn,
+                              onChanged: (value) async {
+                                await applianceProvider.toggleAppliance(
+                                    appliance, value);
+                              },
+                              activeTrackColor: Colors.green[700],
+                              activeColor: Colors.green[900],
+                              inactiveTrackColor: Colors.grey[400],
+                              inactiveThumbColor: Colors.grey[300],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showEditDialog(appliance, index),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () =>
-                              _showRemoveConfirmationDialog(appliance),
-                        ),
-                      ],
+                          Row(
+                            // Edit and delete buttons
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () =>
+                                    _showEditDialog(appliance, index),
+                              ),
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () =>
+                                    _showRemoveConfirmationDialog(appliance),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
           );
         } else if (snapshot.hasError) {
@@ -208,7 +210,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
     return Container(
       width: MediaQuery.of(context).size.width * 0.7,
       padding: const EdgeInsets.all(12.0),
-      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+      margin: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 12.0),
       decoration: BoxDecoration(
         color: const Color.fromARGB(255, 223, 236, 219),
         borderRadius: BorderRadius.circular(10.0),
@@ -254,7 +256,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: MediaQuery.of(context).size.width * 0.75,
+            width: MediaQuery.of(context).size.width * 0.95,
             child: Container(
               // This is the main container for date, refresh button, and list
               padding: const EdgeInsets.all(8.0),
@@ -288,6 +290,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         onPressed: () async {
@@ -344,7 +347,7 @@ class _DeviceInfoWidgetState extends State<DeviceInfoWidget> {
                       backgroundColor: const Color.fromARGB(255, 54, 83, 56),
                       foregroundColor: const Color(0xFFe8f5e9),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 18),
+                          horizontal: 40, vertical: 14),
                       textStyle: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.normal,

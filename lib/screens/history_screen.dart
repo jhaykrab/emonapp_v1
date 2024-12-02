@@ -91,7 +91,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           : Column(
               children: [
                 // Space above time buttons
-                const SizedBox(height: 40), // Add spacing above buttons
+                const SizedBox(height: 20), // Add spacing above buttons
 
                 // Time Buttons Row
                 Row(

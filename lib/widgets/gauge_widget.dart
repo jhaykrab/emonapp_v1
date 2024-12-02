@@ -1,77 +1,104 @@
-import 'dart:async'; // Import StreamSubscription
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gauge_indicator/gauge_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class GaugeWidget extends StatefulWidget {
-  const GaugeWidget({Key? key}) : super(key: key);
+  final double energy;
+  const GaugeWidget({Key? key, required this.energy}) : super(key: key);
 
   @override
   _GaugeWidgetState createState() => _GaugeWidgetState();
 }
 
 class _GaugeWidgetState extends State<GaugeWidget> {
-  double _totalEnergy = 0.0;
+  double _totalDailyEnergy = 0.0;
   bool _isLoading = true;
-  bool _isResetEnabled = true; // Controls Reset button state
-  late StreamSubscription<DatabaseEvent> _energySubscription; // Subscription
+  late StreamSubscription<DatabaseEvent> _energySubscription;
 
   @override
   void initState() {
     super.initState();
-    _listenForEnergyChanges(); // Start listening in initState
+    _listenForDailyEnergy();
   }
 
   @override
   void dispose() {
-    _energySubscription
-        .cancel(); // Cancel the listener when the widget is disposed
+    _energySubscription.cancel();
     super.dispose();
   }
 
-  void _listenForEnergyChanges() async {
+  void _listenForDailyEnergy() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final dbRef = FirebaseDatabase.instance.ref();
-        final paths = [
-          'SensorReadings',
-          'SensorReadings_2',
-          'SensorReadings_3'
-        ];
+      if (user == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return; // If the user is not authenticated, stop and set loading to false
+      }
 
-        _energySubscription = dbRef.onValue.listen((DatabaseEvent event) async {
-          double totalEnergy = 0;
-          for (final path in paths) {
-            final snapshot = await dbRef.child(path).get();
+      final dbRef = FirebaseDatabase.instance.ref();
+      final paths = [
+        'SensorReadings',
+        'SensorReadings_2',
+        'SensorReadings_3',
+      ];
 
-            if (snapshot.exists) {
-              final data = snapshot.value as Map<dynamic, dynamic>;
+      print('Listening for daily energy data...');
+      _energySubscription = dbRef.onValue.listen((DatabaseEvent event) async {
+        double dailyEnergy = 0.0;
 
-              if (data['uid'] == user.uid) {
-                totalEnergy += (data['energy'] ?? 0.0).toDouble();
+        for (final path in paths) {
+          final snapshot = await dbRef.child(path).get();
 
-                // Check resetEnergy to toggle button state
-                bool resetEnergy = data['resetEnergy'] ?? false;
-                setState(() {
-                  _isResetEnabled =
-                      !resetEnergy; // Reset button enabled if resetEnergy is false
-                });
+          if (snapshot.exists) {
+            final data = snapshot.value as Map<dynamic, dynamic>;
+            final DateTime now = DateTime.now();
+
+            data.forEach((key, value) {
+              // Print the data for debugging purposes
+              print('Data received: $value');
+
+              // Check if value is a valid Map and contains necessary keys
+              if (value != null &&
+                  value is Map &&
+                  value.containsKey('uid') &&
+                  value.containsKey('energy') &&
+                  value.containsKey('timestamp')) {
+                // Only process the data for the current user
+                if (value['uid'] == user.uid) {
+                  final timestamp = value['timestamp'] != null
+                      ? DateTime.fromMillisecondsSinceEpoch(
+                          (value['timestamp'] ?? 0) * 1000)
+                      : DateTime(
+                          0); // Fallback to DateTime(0) if timestamp is missing
+
+                  final DateTime now = DateTime.now();
+
+                  // Check if the timestamp corresponds to today's date
+                  if (timestamp.year == now.year &&
+                      timestamp.month == now.month &&
+                      timestamp.day == now.day) {
+                    // Add the energy value to the daily energy total
+                    dailyEnergy += (value['energy'] ?? 0.0).toDouble();
+                  }
+                }
               }
-            }
-          }
-
-          if (mounted) {
-            setState(() {
-              _totalEnergy = totalEnergy;
-              _isLoading = false;
             });
           }
-        });
-      }
+        }
+
+        if (mounted) {
+          setState(() {
+            _totalDailyEnergy = dailyEnergy;
+            _isLoading = false;
+          });
+        }
+      });
     } catch (e) {
-      print('Error fetching total energy: $e');
+      print('Error fetching daily energy: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -84,7 +111,7 @@ class _GaugeWidgetState extends State<GaugeWidget> {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 150,
-      child: _isLoading // Conditionally render loader or gauge
+      child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
               alignment: Alignment.center,
@@ -93,10 +120,10 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                   duration: const Duration(seconds: 1),
                   curve: Curves.elasticOut,
                   radius: 150,
-                  value: _totalEnergy, // Use the total energy value
+                  value: _totalDailyEnergy, // Set the gauge value
                   axis: GaugeAxis(
                     min: 0,
-                    max: 7, // Set max value back to 7
+                    max: 7,
                     degrees: 180,
                     style: const GaugeAxisStyle(
                       thickness: 21,
@@ -104,21 +131,21 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                       segmentSpacing: 3,
                     ),
                     progressBar: GaugeProgressBar.rounded(
-                      color: null,
                       gradient: const GaugeAxisGradient(
                         colors: [
                           Color.fromARGB(255, 69, 204, 73),
-                          Color.fromARGB(255, 202, 60, 41)
+                          Color.fromARGB(255, 202, 60, 41),
                         ],
                       ),
                     ),
                   ),
                 ),
+                // Existing UI remains unchanged
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(height: 50),
-                    Text(
+                    const SizedBox(height: 50),
+                    const Text(
                       'Today',
                       style: TextStyle(
                         fontSize: 16,
@@ -126,36 +153,36 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                         color: Color.fromARGB(255, 72, 100, 68),
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${_totalEnergy.toStringAsFixed(3)}', // Display total energy
+                          '${_totalDailyEnergy.toStringAsFixed(3)}',
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
-                            color: _totalEnergy >= 6 // Updated color conditions
+                            color: _totalDailyEnergy >= 6
                                 ? Colors.red
-                                : _totalEnergy >= 5
+                                : _totalDailyEnergy >= 5
                                     ? Colors.deepOrangeAccent
-                                    : _totalEnergy >= 4
+                                    : _totalDailyEnergy >= 4
                                         ? const Color.fromARGB(
                                             255, 245, 179, 93)
-                                        : _totalEnergy >= 3
+                                        : _totalDailyEnergy >= 3
                                             ? const Color.fromARGB(
                                                 255, 150, 221, 36)
-                                            : _totalEnergy >= 2
+                                            : _totalDailyEnergy >= 2
                                                 ? const Color.fromARGB(
                                                     255, 131, 223, 78)
-                                                : _totalEnergy >= 1
+                                                : _totalDailyEnergy >= 1
                                                     ? const Color.fromARGB(
                                                         255, 132, 247, 79)
                                                     : Colors.green,
                           ),
                         ),
-                        SizedBox(width: 4),
-                        Text(
+                        const SizedBox(width: 4),
+                        const Text(
                           'kWh',
                           style: TextStyle(
                             fontSize: 30,
@@ -164,92 +191,93 @@ class _GaugeWidgetState extends State<GaugeWidget> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Text(
-                      _totalEnergy == 0.00
+                      _totalDailyEnergy == 0.00
                           ? 'No Energy Consumed'
-                          : _totalEnergy <= 2 // Updated text conditions
+                          : _totalDailyEnergy <= 2
                               ? 'Low Energy Consumption'
-                              : _totalEnergy > 2 && _totalEnergy <= 4
+                              : _totalDailyEnergy > 2 && _totalDailyEnergy <= 4
                                   ? 'Average Energy Consumption'
-                                  : _totalEnergy > 4 && _totalEnergy <= 6
+                                  : _totalDailyEnergy > 4 &&
+                                          _totalDailyEnergy <= 6
                                       ? 'High Energy Consumption'
                                       : 'Extremely High Consumption',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.normal,
-                        color: _totalEnergy == 0
+                        color: _totalDailyEnergy == 0
                             ? Colors.grey
-                            : _totalEnergy <= 2
+                            : _totalDailyEnergy <= 2
                                 ? Colors.green
-                                : _totalEnergy > 2 && _totalEnergy <= 4
+                                : _totalDailyEnergy > 2 &&
+                                        _totalDailyEnergy <= 4
                                     ? const Color.fromARGB(255, 115, 180, 9)
-                                    : _totalEnergy > 4 && _totalEnergy <= 6
+                                    : _totalDailyEnergy > 4 &&
+                                            _totalDailyEnergy <= 6
                                         ? Colors.orange
                                         : Colors.red,
                       ),
                     ),
-                    SizedBox(height: 10),
                   ],
                 ),
-                // Adjusted positions and font sizes for the gauge labels
+                // Keep gauge labels unchanged
                 Positioned(
-                  top: 135, // Moved down by 20
-                  left: 30, // Moved right by 50
-                  child: Text('0',
+                  top: 135,
+                  left: 30,
+                  child: const Text('0',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 95, // Moved down by 20
-                  left: 45, // Moved right by 50
-                  child: Text('1',
+                  top: 95,
+                  left: 45,
+                  child: const Text('1',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 55, // Moved down by 20
-                  left: 75, // Moved right by 50
-                  child: Text('2',
+                  top: 55,
+                  left: 75,
+                  child: const Text('2',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 30, // Moved down by 20
-                  left: 120, // Moved right by 50
-                  child: Text('3',
+                  top: 30,
+                  left: 120,
+                  child: const Text('3',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 30, // Moved down by 20
-                  left: 168, // Moved right by 50
-                  child: Text('4',
+                  top: 30,
+                  left: 168,
+                  child: const Text('4',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 55, // Moved down by 20
-                  left: 220, // Moved right by 50
-                  child: Text('5',
+                  top: 55,
+                  left: 220,
+                  child: const Text('5',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 95, // Moved down by 20
-                  left: 250, // Moved right by 50
-                  child: Text('6',
+                  top: 95,
+                  left: 250,
+                  child: const Text('6',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 Positioned(
-                  top: 135, // Moved down by 20
-                  left: 260, // Moved right by 50
-                  child: Text('7',
+                  top: 135,
+                  left: 260,
+                  child: const Text('7',
                       style:
                           TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 10),
               ],
             ),
     );

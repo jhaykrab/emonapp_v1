@@ -234,12 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   pageController: _pageController, // Pass pageController
                   onTimeButtonTapped: _onTimeButtonTapped,
                 ),
-                DailyPageTestMode(
-                  selectedTabIndex: _selectedTabIndex,
-                  setSelectedTabIndex: setSelectedTabIndex,
-                  pageController: _pageController, // Pass pageController
-                  onTimeButtonTapped: _onTimeButtonTapped,
-                ),
+
                 WeeklyPage(
                   selectedTabIndex: _selectedTabIndex,
                   setSelectedTabIndex: setSelectedTabIndex,
@@ -247,6 +242,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTimeButtonTapped: _onTimeButtonTapped,
                 ),
                 MonthlyPage(
+                  selectedTabIndex: _selectedTabIndex,
+                  setSelectedTabIndex: setSelectedTabIndex,
+                  pageController: _pageController, // Pass pageController
+                  onTimeButtonTapped: _onTimeButtonTapped,
+                ),
+                DailyPageTestMode(
                   selectedTabIndex: _selectedTabIndex,
                   setSelectedTabIndex: setSelectedTabIndex,
                   pageController: _pageController, // Pass pageController
