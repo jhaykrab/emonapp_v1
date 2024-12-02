@@ -1,8 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:Emon/widgets/app_bar_widget.dart'; // Import AppBarWidget
-import 'package:Emon/widgets/bottom_nav_bar_widget.dart'; // Import BottomNavBarWidget
 
 class RealTimeAnalyticsPage extends StatefulWidget {
   const RealTimeAnalyticsPage({Key? key}) : super(key: key);
@@ -16,139 +16,97 @@ class _RealTimeAnalyticsPageState extends State<RealTimeAnalyticsPage> {
       FirebaseDatabase.instance.ref('SensorReadings');
   double _totalEnergy = 0.0;
   List<FlSpot> _graphData = [];
-  FlSpot? mostLeftSpot; // Make `mostLeftSpot` nullable.
-  int _selectedNavbarIndex =
-      3; // Set to 3 for the History tab in the bottom navbar
+  double _maxY = 3.0; // Initialize maxY; adjust as needed
 
   @override
   void initState() {
     super.initState();
-    mostLeftSpot = FlSpot(0, 0); // Provide a default value.
     _listenToRealtimeData();
-  }
-
-  void _updateGraphData() {
-    if (_graphData.isNotEmpty) {
-      mostLeftSpot = _graphData.reduce((a, b) => a.x < b.x ? a : b);
-    } else {
-      // Set to null if `_graphData` is empty.
-      mostLeftSpot = null;
-    }
   }
 
   void _listenToRealtimeData() {
     _realtimeRef.onValue.listen((event) {
       final data = event.snapshot.value as Map<dynamic, dynamic>?;
       if (data != null) {
-        final double energy = (data['energy_kWh'] ?? 0.0).toDouble();
+        final energy = (data['energy_kWh'] ?? 0.0).toDouble();
         final now = DateTime.now();
-
         setState(() {
           _totalEnergy = energy;
+          _graphData.add(FlSpot(
+            now.hour + now.minute / 60.0,
+            energy,
+          ));
+          _maxY =
+              max(_maxY, energy * 1.1); // Dynamically adjust maxY with a buffer
 
-          // Add data to graph.
-          _graphData.add(
-            FlSpot(now.hour + now.minute / 60, energy),
-          );
-
-          // Keep only the last 24 hours of data.
           _graphData = _graphData.where((spot) {
-            return now
-                    .difference(DateTime(
-                      now.year,
-                      now.month,
-                      now.day,
-                      spot.x.toInt(),
-                      ((spot.x - spot.x.toInt()) * 60).toInt(),
-                    ))
-                    .inHours <=
-                24;
+            final timeDifference = now.difference(DateTime(
+              now.year,
+              now.month,
+              now.day,
+              spot.x.toInt(),
+              ((spot.x - spot.x.toInt()) * 60).toInt(),
+            ));
+            return timeDifference.inHours <= 24;
           }).toList();
-
-          // Update `mostLeftSpot`.
-          _updateGraphData();
         });
       }
     });
   }
 
   @override
-  void dispose() {
-    _realtimeRef.onDisconnect();
-    super.dispose();
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedNavbarIndex = index;
-      // Add any navigation logic if needed for other BottomNavigationBar items.
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBarWidget(
-          userName: 'User Full Name'), // Using AppBarWidget from HistoryScreen
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Title
-            const Text(
-              "Real-Time Energy Consumption",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
             const SizedBox(height: 20),
-
-            // Gauge Widget
             _buildGaugeWidget(),
-
             const SizedBox(height: 20),
-
-            // Line Graph
             Expanded(
+              flex: 2, // Gauge and graph balance
               child: _buildLineGraph(),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavBarWidget(
-        selectedIndex: _selectedNavbarIndex,
-        onItemTapped: _onItemTapped,
-      ), // Using BottomNavBarWidget from HistoryScreen
     );
   }
 
   Widget _buildGaugeWidget() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.10,
+      padding: const EdgeInsets.symmetric(
+          vertical: 8, horizontal: 12), // Reduced padding
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12), // Reduced border radius
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.3),
-            blurRadius: 10,
-            spreadRadius: 2,
-            offset: const Offset(0, 5),
+            blurRadius: 8, // Slightly reduced blur
+            spreadRadius: 1, // Slightly reduced spread
+            offset: const Offset(0, 4), // Slightly reduced offset
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize
+            .min, // Ensures the card is only as large as its contents
         children: [
           Text(
             "${_totalEnergy.toStringAsFixed(3)} kWh",
             style: const TextStyle(
-              fontSize: 28,
+              fontSize: 24, // Reduced font size
               fontWeight: FontWeight.bold,
               color: Colors.green,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8), // Reduced spacing
           const Text(
             "Current Energy Consumption",
-            style: TextStyle(fontSize: 16),
+            style: TextStyle(fontSize: 14), // Reduced font size
           ),
         ],
       ),
@@ -156,140 +114,118 @@ class _RealTimeAnalyticsPageState extends State<RealTimeAnalyticsPage> {
   }
 
   Widget _buildLineGraph() {
-    return Flexible(
-      flex: 3,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // Align title to the left
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 4.0), // Add left padding to title
-            child: Text(
-              "Energy Consumption Over Time",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+    final numLabels = 7;
+    final interval = _maxY / (numLabels - 1);
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.2, // 30% of screen height
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12), // Reduced border radius
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            blurRadius: 8, // Reduced blur
+            spreadRadius: 1, // Reduced spread
+            offset: const Offset(0, 4), // Reduced offset
           ),
-          const SizedBox(height: 8), // Reduced spacing
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.3,
-            child: Card(
-              elevation: 4,
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.only(
-                    top: 8.0,
-                    bottom: 24,
-                    left: 8,
-                    right:
-                        8), // Increased bottom padding for x-axis labels, adjusted others
-                child: LineChart(
-                  LineChartData(
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: _graphData,
-                        isCurved: true,
-                        barWidth: 3,
-                        gradient: LinearGradient(
-                          colors: [Colors.blue, Colors.lightBlueAccent],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.withOpacity(0.3),
-                              Colors.lightBlueAccent.withOpacity(0.1),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                        ),
-                      ),
-                    ],
-                    minX: 0,
-                    maxX: 24,
-                    minY: 0,
-                    maxY: 3,
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        axisNameWidget: const Text(
-                          "kWh", // Shortened label
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            return Text(
-                              value.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 8),
-                            );
-                          },
-                          reservedSize: 20,
-                          interval: 0.5,
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        axisNameWidget: const Text(
-                          "Time",
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            final hour = value.toInt();
-                            final time = TimeOfDay(hour: hour, minute: 0);
-
-                            // Check if it's 12:00 AM (0) and return an empty SizedBox
-                            if (hour == 0) {
-                              return const SizedBox.shrink();
-                            }
-
-                            return Transform.rotate(
-                              angle: -0.7854,
-                              child: Text(
-                                time.format(context),
-                                style: const TextStyle(fontSize: 8),
-                              ),
-                            );
-                          },
-                          interval: 2,
-                          reservedSize: 30,
-                        ),
-                      ),
-                      topTitles: AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                    ),
-                    borderData: FlBorderData(
-                        show: true,
-                        border: Border.all(
-                            color: Colors.grey
-                                .withOpacity(0.5))), // Added a border
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false, // Remove vertical lines
-                      drawHorizontalLine: true,
-                      getDrawingHorizontalLine: (value) => FlLine(
-                        color: Colors.grey.withOpacity(0.3),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                  ),
-                ),
+        ],
+      ),
+      child: LineChart(LineChartData(
+        lineBarsData: [
+          LineChartBarData(
+            spots: _graphData,
+            isCurved: true,
+            barWidth: 2.5,
+            gradient: const LinearGradient(
+              colors: [Colors.blue, Colors.lightBlueAccent],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.blue.withOpacity(0.3),
+                  Colors.lightBlueAccent.withOpacity(0.1),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
             ),
           ),
         ],
-      ),
+        minX: 0,
+        maxX: 24,
+        minY: 0,
+        maxY: _maxY, // Use the dynamic _maxY
+        titlesData: FlTitlesData(
+          show: true,
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            axisNameWidget: const Text(
+              "Energy (kWh)",
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 25, // Slightly increase reserved size for labels
+              interval: interval, // Dynamic interval
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toStringAsFixed(1), // Display one decimal place
+                  style: const TextStyle(fontSize: 8),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameWidget: const Padding(
+              padding: EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Time (Hours)',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 2.0,
+              getTitlesWidget: (value, meta) {
+                final hour = value.toInt();
+                return Transform.rotate(
+                  angle: -pi / 4, // Rotate for better readability
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      '$hour:00',
+                      style: const TextStyle(fontSize: 8),
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: true),
+        gridData: FlGridData(
+          show: true,
+          horizontalInterval: interval, // Dynamic interval for grid lines
+          verticalInterval: 2.0,
+          drawVerticalLine: true,
+          drawHorizontalLine: true,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.3),
+            strokeWidth: 0.8,
+          ),
+          getDrawingVerticalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.3),
+            strokeWidth: 0.8,
+          ),
+        ),
+      )),
     );
   }
 }

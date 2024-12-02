@@ -61,10 +61,9 @@ class RealTimePage extends StatelessWidget {
             ),
           ),
 
-          // Gauge Widget displaying consumption stats
           const SizedBox(height: 50),
+          // Gauge Widget displaying consumption stats
           const GaugeWidget(),
-
           // Time Buttons for selecting time ranges (Daily, Weekly, etc.)
           const SizedBox(height: 20),
           TimeButtons(

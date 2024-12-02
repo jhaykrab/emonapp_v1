@@ -1,47 +1,42 @@
-
 plugins {
-    id 'com.android.application'
+    id 'com.android.application' version '8.5' apply false
+    id 'com.android.library' version '8.5' apply false
     id 'kotlin-android'
     id 'dev.flutter.flutter-gradle-plugin'
-    id 'com.google.gms.google-services' 
+    id 'com.google.gms.google-services' // Firebase plugin
 }
 
 ext {
-    kotlin_version = '2.0.0' // Or your desired Kotlin version
+    kotlin_version = '1.9.10' // Latest stable Kotlin version
 }
-
-
 
 android {
     namespace = 'com.example.emonapp_v1'
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
-    
- compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+    compileSdk = 34 // Specify the compile SDK version
+    ndkVersion = '23.1.7779620' // Specify the NDK version
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = '21'
     }
 
-  
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = 'com.example.emonapp_v1'
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 21
+        targetSdk = 34
 
+        // Additional configurations
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
     }
 }
@@ -51,22 +46,35 @@ flutter {
 }
 
 dependencies {
-    implementation(platform('com.google.firebase:firebase-bom:33.5.1'))
-    implementation('com.google.firebase:firebase-analytics')
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version")
-    implementation platform('com.google.firebase:firebase-bom:32.2.3')
+    // Firebase dependencies using BoM (Bill of Materials)
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'com.google.firebase:firebase-storage'
     implementation 'com.firebaseui:firebase-ui-auth:7.2.0'
+
+    // Kotlin Standard Library
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+
+    // Glide for image loading
     implementation 'com.github.bumptech.glide:glide:4.16.1'
+
+    // Material Design components
     implementation 'com.google.android.material:material:1.11.0'
+
+    // AndroidX libraries
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Flutter embedding runner
+    implementation("io.flutter:flutter_embedding_runner")
+
+    // Testing libraries
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    implementation("io.flutter:flutter_embedding_runner")
 }
 
-apply plugin: 'com.google.gms.google-services' 
+// Apply the Firebase services plugin
+apply plugin: 'com.google.gms.google-services'
