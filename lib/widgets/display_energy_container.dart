@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:Emon/widgets/gauge_widget.dart'; // Import GaugeWidget
+import 'package:intl/intl.dart';
 
 class DisplayEnergyContainer extends StatefulWidget {
   const DisplayEnergyContainer({Key? key}) : super(key: key);
@@ -21,10 +22,10 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
   @override
   void initState() {
     super.initState();
-    _fetchEnergyData();
+    _initializeGraphData();
 
     // Periodically update the graph with new data
-    _updateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _addDataPoint();
     });
   }
@@ -35,31 +36,29 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
     super.dispose();
   }
 
-  Future<void> _fetchEnergyData() async {
-    try {
-      await Future.delayed(
-          const Duration(seconds: 1)); // Simulate a network delay
-      double fetchedEnergy = 3.5; // Example fetched energy value
+  void _initializeGraphData() {
+    DateTime now = DateTime.now();
+    DateTime startTime = DateTime(now.year, now.month, now.day, 0, 0);
 
-      if (mounted) {
-        setState(() {
-          _totalEnergy = fetchedEnergy;
-          _isLoading = false;
-        });
-        _addDataPoint(); // Add the first data point
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = "Failed to fetch energy data. Please try again.";
-        });
-      }
+    List<FlSpot> initialData = [];
+    while (startTime.isBefore(now) || startTime.isAtSameMomentAs(now)) {
+      initialData.add(FlSpot(
+        startTime.hour + startTime.minute / 60.0,
+        0.0, // Initialize with 0 energy or fetch actual data if available
+      ));
+      startTime = startTime.add(const Duration(minutes: 1));
     }
+
+    setState(() {
+      _graphData = initialData;
+      _isLoading = false;
+    });
   }
 
   void _addDataPoint() {
-    final now = DateTime.now();
+    DateTime now = DateTime.now();
+
+    // Add a new point with the current energy
     final newSpot = FlSpot(
       now.hour + now.minute / 60.0, // Time in hours
       _totalEnergy,
@@ -70,16 +69,29 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
 
       // Keep only the last 24 hours of data
       _graphData = _graphData.where((spot) {
-        final timeDifference = now.difference(DateTime(
+        final spotTime = DateTime(
           now.year,
           now.month,
           now.day,
           spot.x.toInt(),
           ((spot.x - spot.x.toInt()) * 60).toInt(),
-        ));
+        );
+        final timeDifference = now.difference(spotTime);
         return timeDifference.inHours <= 24;
       }).toList();
     });
+  }
+
+  // Callback to handle energy updates from the GaugeWidget
+  void _onEnergyUpdate(double updatedEnergy) {
+    setState(() {
+      _totalEnergy = updatedEnergy;
+    });
+  }
+
+  String _getFormattedDateTime() {
+    DateTime now = DateTime.now();
+    return DateFormat('yyyy-MM-dd-EEEE_HH:mm:ss a').format(now);
   }
 
   @override
@@ -112,16 +124,62 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
-                      "Current Energy Consumption",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: const Color.fromARGB(255, 54, 83, 56),
+                          width: 2.0,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.bolt,
+                              color: Color.fromARGB(255, 231, 175, 22)),
+                          SizedBox(width: 8),
+                          Text(
+                            "Realtime Analytics",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 54, 83, 56),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    GaugeWidget(energy: _totalEnergy), // Pass total energy here
-                    const SizedBox(height: 16),
+                    // Pass the onEnergyUpdate callback to the GaugeWidget
+                    GaugeWidget(
+                      energy: _totalEnergy,
+                      onEnergyUpdate: _onEnergyUpdate,
+                    ),
+                    const SizedBox(height: 20),
+                    // Display the current date and time
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.access_time, // Clock icon
+                          color: Color.fromARGB(255, 54, 83, 56), // Icon color
+                          size: 18, // Icon size
+                        ),
+                        const SizedBox(width: 8), // Space between icon and text
+                        Text(
+                          _getFormattedDateTime(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color.fromARGB(255, 54, 83, 56),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+                    // Display the line chart (gra
                     _buildLineGraph(), // Include the line graph
                   ],
                 ),
@@ -149,9 +207,16 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
           LineChartBarData(
             spots: _graphData,
             isCurved: true,
-            barWidth: 2.5,
+            barWidth:
+                1.0, // Thinner green line (adjust this value to make it thinner or thicker)
+            dotData: FlDotData(
+              show: true, // Show dots on each data point
+            ),
             gradient: const LinearGradient(
-              colors: [Colors.blue, Colors.lightBlueAccent],
+              colors: [
+                Color.fromARGB(255, 54, 83, 56),
+                Color.fromARGB(255, 145, 235, 123)
+              ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
@@ -159,8 +224,8 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
               show: true,
               gradient: LinearGradient(
                 colors: [
-                  Colors.blue.withOpacity(0.3),
-                  Colors.lightBlueAccent.withOpacity(0.1),
+                  const Color.fromARGB(255, 54, 83, 56).withOpacity(0.3),
+                  const Color.fromARGB(255, 145, 235, 123).withOpacity(0.1),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -168,9 +233,9 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
             ),
           ),
         ],
-        minX: 0,
-        maxX: 24,
-        minY: 0,
+        minX: 0.0,
+        maxX: 24.0,
+        minY: 0.0,
         maxY: _maxY,
         titlesData: FlTitlesData(
           show: true,
@@ -220,6 +285,39 @@ class _DisplayEnergyContainerState extends State<DisplayEnergyContainer> {
           getDrawingVerticalLine: (_) => FlLine(
             color: Colors.grey.withOpacity(0.3),
             strokeWidth: 0.8,
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            tooltipMargin: 8,
+            tooltipPadding: const EdgeInsets.all(8),
+            tooltipRoundedRadius: 8,
+            tooltipBorder: const BorderSide(
+              color: Colors.white, // Tooltip border color
+            ),
+            getTooltipItems: (List<LineBarSpot> touchedSpots) {
+              return touchedSpots.map((spot) {
+                // Convert the time to DateTime object based on the x value (hours)
+                DateTime time = DateTime(2024, 1, 1, spot.x.toInt(),
+                    ((spot.x - spot.x.toInt()) * 60).toInt());
+                String formattedTime = DateFormat('hh:mm a')
+                    .format(time); // Format time as '11:01 AM'
+
+                return LineTooltipItem(
+                  'Time: $formattedTime\nEnergy: ${spot.y.toStringAsFixed(2)} kWh',
+                  TextStyle(
+                    color: Color.fromARGB(
+                        255, 54, 83, 56), // Dark green text color
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              }).toList();
+            },
+            // Modify the tooltip background color to white
+            getTooltipColor: (touchedSpot) {
+              return Colors.white;
+            },
           ),
         ),
       )),

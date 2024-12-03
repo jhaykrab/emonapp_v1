@@ -3,10 +3,7 @@ import 'package:Emon/widgets/gauge_widget.dart'; // Import updated GaugeWidget
 import 'package:Emon/widgets/device_info_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:Emon/providers/appliance_provider.dart';
-import 'package:Emon/screens/setup_appliance_screen.dart';
-import 'package:Emon/screens/appliance_list.dart';
 import 'package:Emon/widgets/time_buttons.dart'; // Import TimeButtons
-import 'package:Emon/screens/dashboard_screen.dart'; // Import DashboardScreen for GlobalKey
 
 class RealTimePage extends StatelessWidget {
   final int selectedTabIndex;
@@ -28,9 +25,15 @@ class RealTimePage extends StatelessWidget {
 
     // Aggregate energy data from all appliances
     final double totalEnergy = applianceProvider.appliances.fold(
-      0.0,
+      0.0, // Start with 0.0
       (sum, appliance) => sum + appliance.energy,
     );
+
+    // Callback for when energy updates occur in GaugeWidget
+    void onEnergyUpdate(double energy) {
+      // You can handle the updated energy value here if needed
+      print('Updated Energy: $energy kWh');
+    }
 
     return SingleChildScrollView(
       child: Column(
@@ -62,9 +65,11 @@ class RealTimePage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 25),
-          // Pass the aggregated energy to the GaugeWidget
+          // Pass the aggregated energy and onEnergyUpdate to the GaugeWidget
           GaugeWidget(
-              energy: totalEnergy), // Pass the totalEnergy to GaugeWidget
+            energy: totalEnergy,
+            onEnergyUpdate: onEnergyUpdate, // Pass the callback here
+          ),
           const SizedBox(height: 20),
           TimeButtons(
             pageController: pageController,

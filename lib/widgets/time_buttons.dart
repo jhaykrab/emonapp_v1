@@ -31,9 +31,9 @@ class TimeButtons extends StatelessWidget {
           children: [
             _buildTimeButton('R-Time', 0),
             _buildTimeButton('Daily', 1),
-            _buildTimeButton('Weekly', 3),
-            _buildTimeButton('Monthly', 4),
-            _buildTimeButton('Test Mode', 2),
+            _buildTimeButton('Weekly', 2),
+            _buildTimeButton('Monthly', 3),
+            _buildTimeButton('Test Mode', 4),
           ],
         ),
         const SizedBox(height: 16), // Adds spacing between rows

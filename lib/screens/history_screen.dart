@@ -6,6 +6,7 @@ import 'package:Emon/widgets/bottom_nav_bar_widget.dart';
 import 'package:Emon/services/database.dart';
 import 'package:Emon/widgets/time_button_widget.dart';
 import 'package:Emon/analytic_pages/realtime_analytics_page.dart';
+import 'package:Emon/analytic_pages/daily_analytics_page.dart';
 
 class HistoryScreen extends StatefulWidget {
   static const String routeName = '/history';
@@ -22,14 +23,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
   late final PageController _pageController;
   String _userName = ''; // Stores fetched username
   User? _user;
+  String? _userId; // Added userId variable
   bool _isLoading = true;
+
+  // New variable for total energy
+  double _totalEnergy = 0.0;
 
   @override
   void initState() {
     super.initState();
     _user = FirebaseAuth.instance.currentUser;
+    _userId = _user?.uid; // Initialize userId
     _pageController = PageController(initialPage: _selectedTabIndex);
     _fetchUserData();
+    _fetchTotalEnergy(); // Fetch total energy data
   }
 
   @override
@@ -56,6 +63,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
         setState(() {
           _userName = 'Guest';
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Simulates fetching total energy data
+  Future<void> _fetchTotalEnergy() async {
+    try {
+      await Future.delayed(
+          const Duration(seconds: 1)); // Simulate network delay
+      double fetchedEnergy = 3.5; // Example fetched energy value
+
+      if (mounted) {
+        setState(() {
+          _totalEnergy = fetchedEnergy;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _totalEnergy = 0.0; // Default to zero if fetching fails
         });
       }
     }
@@ -140,12 +168,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         _selectedTabIndex = index;
                       });
                     },
-                    children: const [
-                      RealTimeAnalyticsPage(), // Replace with actual page widgets
-                      Placeholder(), // DailyAnalyticsPage(),
-                      Placeholder(), // TestModeAnalyticsPage(),
-                      Placeholder(), // WeeklyAnalyticsPage(),
-                      Placeholder(), // MonthlyAnalyticsPage(),
+                    children: [
+                      RealTimeAnalyticsPage(totalEnergy: _totalEnergy),
+                      DailyAnalyticsPage(
+                          userId: _userId!), // Pass the userId here
+                      // DailyAnalyticsPage(),
+                      const Placeholder(), // TestModeAnalyticsPage(),
+                      const Placeholder(), // WeeklyAnalyticsPage(),
+                      const Placeholder(), // MonthlyAnalyticsPage(),
                     ],
                   ),
                 ),

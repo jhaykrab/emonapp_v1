@@ -1,74 +1,53 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:Emon/widgets/display_energy_container.dart';
 
 class RealTimeAnalyticsPage extends StatefulWidget {
-  const RealTimeAnalyticsPage({Key? key}) : super(key: key);
+  final double totalEnergy; // Accept energy value from parent
+
+  const RealTimeAnalyticsPage({Key? key, required this.totalEnergy})
+      : super(key: key);
 
   @override
   _RealTimeAnalyticsPageState createState() => _RealTimeAnalyticsPageState();
 }
 
 class _RealTimeAnalyticsPageState extends State<RealTimeAnalyticsPage> {
-  final DatabaseReference _realtimeRef =
-      FirebaseDatabase.instance.ref(); // Root reference for Firebase database
-  double _totalEnergy = 0.0;
   List<FlSpot> _graphData = [];
   double _maxY = 3.0; // Maximum Y value for the graph
-  late StreamSubscription<DatabaseEvent> _realtimeSubscription;
 
   @override
-  void initState() {
-    super.initState();
-    _listenToRealtimeData(); // Start listening to realtime updates
+  void didUpdateWidget(covariant RealTimeAnalyticsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Update graph data when totalEnergy changes
+    if (widget.totalEnergy != oldWidget.totalEnergy) {
+      _updateGraphData(widget.totalEnergy);
+    }
   }
 
-  @override
-  void dispose() {
-    _realtimeSubscription.cancel(); // Cancel the subscription when disposed
-    super.dispose();
-  }
+  void _updateGraphData(double totalEnergy) {
+    final now = DateTime.now();
+    setState(() {
+      _graphData.add(
+        FlSpot(now.hour + now.minute / 60.0, totalEnergy),
+      );
 
-  void _listenToRealtimeData() {
-    _realtimeSubscription =
-        _realtimeRef.child('SensorReadings').onValue.listen((event) {
-      final data = event.snapshot.value as Map<dynamic, dynamic>?;
-      if (data != null) {
-        double aggregatedEnergy = 0.0;
+      // Adjust maxY dynamically
+      _maxY = max(_maxY, totalEnergy * 1.1);
 
-        data.forEach((key, deviceData) {
-          if (deviceData is Map<dynamic, dynamic>) {
-            aggregatedEnergy += (deviceData['energy_kWh'] ?? 0.0).toDouble();
-          }
-        });
-
-        final now = DateTime.now();
-
-        setState(() {
-          _totalEnergy = aggregatedEnergy;
-          _graphData.add(FlSpot(
-            now.hour + now.minute / 60.0,
-            _totalEnergy,
-          ));
-          _maxY = max(_maxY, _totalEnergy * 1.1);
-
-          // Filter out data older than 24 hours
-          _graphData = _graphData.where((spot) {
-            final timeDifference = now.difference(DateTime(
-              now.year,
-              now.month,
-              now.day,
-              spot.x.toInt(),
-              ((spot.x - spot.x.toInt()) * 60).toInt(),
-            ));
-            return timeDifference.inHours <= 24;
-          }).toList();
-        });
-      }
+      // Remove data older than 24 hours
+      _graphData = _graphData.where((spot) {
+        final timestamp = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          spot.x.toInt(),
+          ((spot.x - spot.x.toInt()) * 60).toInt(),
+        );
+        return now.difference(timestamp).inHours <= 24;
+      }).toList();
     });
   }
 
